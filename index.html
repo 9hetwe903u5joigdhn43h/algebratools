@@ -1459,10 +1459,18 @@
         lines.push("install guide: " + guide.label + " -> " + guide.url);
         let shim = "never ran";
         try {
-          const seen = localStorage.getItem("eaglercraft.shim");
-          if (seen) {
-            const when = new Date(Number(seen));
-            shim = "active (last run: " + (isNaN(when.getTime()) ? seen : when.toLocaleTimeString()) + ")";
+          const raw = localStorage.getItem("eaglercraft.shim");
+          if (raw) {
+            let info = null;
+            try { info = JSON.parse(raw); } catch (err) { info = { time: Number(raw) }; }
+            if (info && typeof info === "object") {
+              const when = new Date(info.time || 0);
+              const stamp = isNaN(when.getTime()) ? "?" : when.toLocaleTimeString();
+              shim = "active (last run " + stamp +
+                ", lock calls " + (info.lockCalls || 0) +
+                ", unlocks " + (info.unlockCalls || 0) +
+                (info.lockedSeen ? ", lock WAS seen" : "") + ")";
+            }
           }
         } catch (err) { /* ignore */ }
         lines.push("client shim: " + shim);

@@ -35,38 +35,82 @@
     try { console.warn("[shim] " + Array.prototype.join.call(arguments, " ")); } catch (e) { /* ignore */ }
   }
 
+  // Diagnostics: the launcher reads these back so we can tell whether the
+  // shim actually ran, and whether the game tried to lock the keyboard.
+  var stats = { time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false };
+
+  function saveStats() {
+    try { localStorage.setItem("eaglercraft.shim", JSON.stringify(stats)); } catch (err) { /* ignore */ }
+  }
+
   /* ------------------------------------------------------------------
      1. Never actually lock the keyboard
      ------------------------------------------------------------------ */
   try {
     if (navigator.keyboard) {
-      navigator.keyboard.lock = function () {
+      // Patch the instance *and* the prototype: a caller that grabbed
+      // Keyboard.prototype.lock before the shim ran would otherwise still
+      // reach the real implementation.
+      var noLock = function () {
+        stats.lockCalls++;
+        saveStats();
         warn("keyboard lock blocked — system shortcuts stay available");
         return Promise.resolve();
       };
+
+      try {
+        navigator.keyboard.lock = noLock;
+      } catch (err) { /* some browsers make the property read-only */ }
+
+      try {
+        if (window.Keyboard && Keyboard.prototype) Keyboard.prototype.lock = noLock;
+      } catch (err) { /* ignore */ }
+
+      try {
+        Object.defineProperty(navigator.keyboard, "lock", {
+          value: noLock,
+          writable: true,
+          configurable: true
+        });
+      } catch (err) { /* ignore */ }
     }
   } catch (err) {
     warn("could not patch keyboard.lock:", err);
   }
 
   // Safety net: if anything manages to lock the keyboard anyway, drop it.
+  // navigator.keyboard.locked is not implemented everywhere, so this is
+  // best-effort — the lock is also released whenever a key event arrives.
   try {
     if (navigator.keyboard && typeof navigator.keyboard.unlock === "function") {
+      var release = function (why) {
+        try {
+          navigator.keyboard.unlock();
+          stats.unlockCalls++;
+          stats.lockedSeen = false;
+          saveStats();
+          warn("keyboard lock released (" + why + ")");
+        } catch (err) { /* ignore */ }
+      };
       setInterval(function () {
         try {
           if (navigator.keyboard.locked) {
-            navigator.keyboard.unlock();
-            warn("keyboard lock released");
+            stats.lockedSeen = true;
+            saveStats();
+            release("poll");
           }
         } catch (err) { /* ignore */ }
-      }, 1000);
+      }, 500);
+      window.addEventListener("keydown", function () {
+        try {
+          if (navigator.keyboard.locked) release("keydown");
+        } catch (err) { /* ignore */ }
+      }, true);
     }
   } catch (err) { /* ignore */ }
 
   // Leave a trace so the launcher can confirm the shim actually ran.
-  try {
-    localStorage.setItem("eaglercraft.shim", String(Date.now()));
-  } catch (err) { /* private mode */ }
+  saveStats();
 
   // A brief on-screen note, so it is obvious the shim is active.
   try {
