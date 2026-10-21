@@ -1,0 +1,60 @@
+{
+  "generated": "2026-10-21T22:57:50Z",
+  "groups": [
+    {
+      "path": "eagler",
+      "label": "Eaglercraft",
+      "icon": "icons/icon-192.png",
+      "order": 1,
+      "count": 3,
+      "total": 3
+    }
+  ],
+  "clients": [
+    {
+      "id": "eagler/26.2-dev-0.6",
+      "url": "clients/eagler/26.2-dev-0.6.html",
+      "name": "Eaglercraft 26.2 Dev 0.6",
+      "version": "26.2 Dev 0.6",
+      "author": "o_xer",
+      "description": "Minecraft 26.2 in the browser",
+      "icon": "icons/icon-192.png",
+      "group": "eagler",
+      "groupPath": [
+        "eagler"
+      ],
+      "groupLabel": "Eaglercraft",
+      "size": 75602976
+    },
+    {
+      "id": "eagler/26.2-dev-0.6-wisp",
+      "url": "clients/eagler/26.2-dev-0.6-wisp.html",
+      "name": "Eaglercraft 26.2 Dev 0.6 Wispcraft",
+      "version": "26.2 Dev 0.6",
+      "author": "o_xer",
+      "description": "Dev 0.6 build with Wisp for lower ping",
+      "icon": "icons/icon-192.png",
+      "group": "eagler",
+      "groupPath": [
+        "eagler"
+      ],
+      "groupLabel": "Eaglercraft",
+      "size": 77418467
+    },
+    {
+      "id": "eagler/26.2-u2-wisp",
+      "url": "clients/eagler/26.2-u2-wisp.html",
+      "name": "Eaglercraft 26.2 U2 Wispcraft",
+      "version": "26.2 U2",
+      "author": "o_xer",
+      "description": "Update 2 build with Wisp for lower ping",
+      "icon": "icons/icon-192.png",
+      "group": "eagler",
+      "groupPath": [
+        "eagler"
+      ],
+      "groupLabel": "Eaglercraft",
+      "size": 77596035
+    }
+  ]
+}

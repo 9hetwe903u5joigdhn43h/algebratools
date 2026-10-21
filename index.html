@@ -47,7 +47,7 @@
 
     .shell {
       width: 100%;
-      max-width: 560px;
+      max-width: 900px;
       height: 100%;
       max-height: 900px;
       min-width: 0;
@@ -345,6 +345,10 @@
       border-radius: 12px;
       cursor: pointer;
       transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+      /* Hundreds of cards stay cheap: the browser skips laying out the ones
+         that are off screen. */
+      content-visibility: auto;
+      contain-intrinsic-size: auto 78px;
     }
 
     .client-card:hover {
@@ -386,8 +390,7 @@
       object-fit: contain;
     }
 
-    .client-main {
-      flex: 1;
+    .client-main {      flex: 1;
       min-width: 0;
       overflow: hidden;
       padding-top: 1px;
@@ -687,6 +690,320 @@
       max-width: 320px;
     }
 
+    /* --------------------------------------------------------------
+       The client browser: a folder tree beside the client list
+       -------------------------------------------------------------- */
+    .browser {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 16px;
+    }
+
+    .sidebar {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border-right: 1px solid var(--card-border);
+      padding-right: 14px;
+    }
+
+    .search-input {
+      width: 100%;
+      background: #0b1120;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .tree {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #374151 transparent;
+    }
+
+    .tree::-webkit-scrollbar { width: 6px; }
+    .tree::-webkit-scrollbar-thumb { background: #374151; border-radius: 999px; }
+
+    .tree-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 6px 8px;
+      margin-bottom: 1px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      background: transparent;
+      color: var(--text-muted);
+      font: inherit;
+      font-size: 0.82rem;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .tree-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+
+    .tree-item.selected {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .tree-label {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tree-count {
+      flex: 0 0 auto;
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.07);
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+
+    .browser-main {
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .group-header {
+      flex: 0 0 auto;
+      margin: 4px 0 2px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .group-header:first-child { margin-top: 0; }
+
+    /* Icon with a generated monogram behind it, so a client without an
+       icon still looks like something. */
+    .client-icon-wrap {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--card-border);
+    }
+
+    .monogram {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f3f4f6;
+      font: 800 15px/1 ui-monospace, Menlo, Consolas, monospace;
+      letter-spacing: 0.02em;
+    }
+
+    .client-icon-wrap .client-icon {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 0;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .details-btn {
+      width: 30px;
+      height: 30px;
+      font-size: 1.1rem;
+      line-height: 0.8;
+    }
+
+    .details-btn:hover {
+      color: var(--text);
+      border-color: #374151;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .badge.offline {
+      background: rgba(56, 189, 248, 0.14);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: #7dd3fc;
+    }
+
+    /* --------------------------------------------------------------
+       The client details modal
+       -------------------------------------------------------------- */
+    #client-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1300;
+      background: rgba(2, 6, 12, 0.74);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #client-modal.visible { display: flex; }
+
+    .modal-card {
+      width: min(100%, 460px);
+      max-height: 100%;
+      overflow-y: auto;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .modal-head-text { flex: 1 1 auto; min-width: 0; }
+
+    .modal-head h2 {
+      margin: 0 0 3px;
+      font-size: 1.05rem;
+      overflow-wrap: anywhere;
+    }
+
+    .modal-icon {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      flex: 0 0 52px;
+    }
+
+    .modal-icon .client-icon-wrap { width: 52px; height: 52px; flex: 0 0 52px; }
+
+    .modal-facts {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 4px 14px;
+      margin: 14px 0;
+      padding: 12px 0;
+      border-top: 1px solid var(--card-border);
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.78rem;
+    }
+
+    .modal-facts dt { color: var(--text-muted); }
+    .modal-facts dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.74rem;
+    }
+
+    .modal-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .modal-actions .btn {
+      margin-top: 0;
+      width: 100%;
+      padding: 10px 8px;
+      font-size: 0.85rem;
+    }
+
+    /* Launch and Download are the two things people actually want, so they
+       get a row of their own. */
+    #modal-launch, #modal-download { grid-column: 1 / -1; }
+
+    .modal-progress { margin-top: 12px; }
+    .modal-progress .settings-note { margin-top: 8px; }
+
+    /* --------------------------------------------------------------
+       Offline storage in the settings panel
+       -------------------------------------------------------------- */
+    .offline-list { margin-bottom: 10px; }
+
+    .offline-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 0;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.8rem;
+    }
+
+    .offline-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .offline-size { color: var(--text-muted); font-size: 0.72rem; }
+
+    .offline-remove {
+      flex: 0 0 auto;
+      border: 1px solid var(--card-border);
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 7px;
+      padding: 4px 8px;
+      font: inherit;
+      font-size: 0.72rem;
+      cursor: pointer;
+    }
+
+    .offline-remove:hover { color: var(--text); border-color: #374151; }
+
+    @media (max-width: 860px) {
+      .browser { grid-template-columns: minmax(0, 1fr); }
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--card-border);
+        padding-right: 0;
+        padding-bottom: 10px;
+        gap: 8px;
+        max-height: 132px;
+      }
+      /* The tree is a filter, not the main event: on a small screen the
+         client list gets the room. */
+      .tree { max-height: 72px; }
+    }
+
+    @media (max-width: 560px) {
+      /* Reclaim the room the long explanation takes. */
+      .section-sub { display: none; }
+      .tree { max-height: 60px; }
+    }
+
     @media (max-width: 480px) {
       body { padding: 16px; }
       .card { padding: 20px; }
@@ -733,20 +1050,29 @@
         <div class="section-head-row">
           <div class="section-head-text">
             <h2 class="section-title">Clients</h2>
-            <p class="section-sub">Star a client to pin it to the top. The default client opens selected when the launcher loads.</p>
+            <p class="section-sub">Search, pick a folder, or star a client to pin it to the top. The default client opens selected when the launcher loads.</p>
           </div>
           <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
         </div>
       </div>
-      <div class="client-list" id="client-list" role="listbox" aria-label="Eaglercraft clients"></div>
-      <button class="btn" id="launch-btn">Launch Client</button>
+      <div class="browser">
+        <aside class="sidebar">
+          <input class="search-input" id="client-search" type="search" placeholder="Search clients…"
+                 aria-label="Search clients" autocomplete="off" spellcheck="false" />
+          <nav class="tree" id="client-tree" aria-label="Client folders"></nav>
+        </aside>
+        <div class="browser-main">
+          <div class="client-list" id="client-list" role="listbox" aria-label="Eaglercraft clients"></div>
+          <button class="btn" id="launch-btn">Launch Client</button>
+        </div>
+      </div>
     </div>
 
     <div class="enforced" id="enforcement-msg">
       <strong>PWA enforcement:</strong> This launcher must run as an installed PWA. Install it to continue.
     </div>
 
-    <p class="hint">Works offline once installed. Clients are cached for offline play.</p>
+    <p class="hint">Works offline once installed. Download a client from its ⋯ menu to keep it offline.</p>
   </div>
 
   <!-- Blocking install-required overlay (shown until the PWA is installed) -->
@@ -798,6 +1124,37 @@
       </label>
       <p class="settings-note">Type a combination such as <code>Alt+]</code>. The
       client picks these up the next time it starts.</p>
+      <div class="settings-group">Offline storage</div>
+      <div class="setting-row">
+        <span>Downloaded clients</span>
+        <span id="offline-summary" class="settings-note">none</span>
+      </div>
+      <div id="offline-list" class="offline-list"></div>
+      <button class="btn secondary" id="offline-clear">Remove all offline copies</button>
+    </div>
+  </div>
+
+  <!-- Client details -->
+  <div id="client-modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <div id="modal-icon" class="modal-icon"></div>
+        <div class="modal-head-text">
+          <h2 id="modal-title">Client</h2>
+          <div id="modal-meta" class="client-meta"></div>
+        </div>
+        <button class="icon-btn" id="modal-close" aria-label="Close" title="Close">&#10005;</button>
+      </div>
+      <p id="modal-desc" class="client-desc"></p>
+      <dl id="modal-facts" class="modal-facts"></dl>
+      <div class="modal-actions">
+        <button class="btn" id="modal-launch">Launch</button>
+        <button class="btn secondary" id="modal-download">Download for offline</button>
+        <button class="btn secondary" id="modal-favorite">&#9734; Favorite</button>
+        <button class="btn secondary" id="modal-default">Set default</button>
+      </div>
+      <div class="progress modal-progress" id="modal-progress"><span id="modal-progress-bar"></span></div>
+      <p class="settings-note" id="modal-status"></p>
     </div>
   </div>
 
@@ -815,17 +1172,59 @@
        Client configuration
        -------------------------------------------------------------- */
     let clients = [];
+    let groups = [];
     let selectedClientId = null;
     let defaultClientId = null;
     let favorites = new Set();
     let deferredInstallPrompt = null;
     let pwaEnforced = false;
 
+    // What the sidebar is showing: "" = everything, "favorites" = the
+    // starred ones, otherwise the path of a folder.
+    let activeGroup = "";
+    let searchTerm = "";
+
+    // The client the details modal is showing.
+    let modalClient = null;
+
+    // True when the catalog could not be fetched at all (usually: offline
+    // and never fetched before).
+    let catalogMissing = false;
+
+    // The last catalog that was rendered, so a repeated fetch that returns
+    // the same thing does not rebuild the list.
+    let catalogSignatureValue = null;
+
+    // True while a catalog fetch is in flight.
+    let catalogLoading = false;
+
+    // Offline copies the user asked for: path -> size in bytes. The paths
+    // are the ones from the catalog, so they match the client urls.
+    let offlineClients = new Map();
+    // Downloads in flight: path -> {loaded, total}.
+    let downloads = new Map();
+
     const STORAGE_FAVORITES = "eaglercraft.launcher.favorites";
     const STORAGE_DEFAULT = "eaglercraft.launcher.defaultClient";
 
     const clientList = document.getElementById("client-list");
+    const clientTree = document.getElementById("client-tree");
+    const clientSearch = document.getElementById("client-search");
     const launchBtn = document.getElementById("launch-btn");
+    const clientModal = document.getElementById("client-modal");
+    const modalIcon = document.getElementById("modal-icon");
+    const modalTitle = document.getElementById("modal-title");
+    const modalMeta = document.getElementById("modal-meta");
+    const modalDesc = document.getElementById("modal-desc");
+    const modalFacts = document.getElementById("modal-facts");
+    const modalStatus = document.getElementById("modal-status");
+    const modalDownload = document.getElementById("modal-download");
+    const modalFavorite = document.getElementById("modal-favorite");
+    const modalDefault = document.getElementById("modal-default");
+    const modalProgress = document.getElementById("modal-progress");
+    const modalProgressBar = document.getElementById("modal-progress-bar");
+    const offlineSummary = document.getElementById("offline-summary");
+    const offlineList = document.getElementById("offline-list");
     const banner = document.getElementById("install-banner");
     const bannerInstall = document.getElementById("banner-install");
     const bannerClose = document.getElementById("banner-close");
@@ -883,66 +1282,282 @@
       selectedClientId = defaultClientId;
     }
 
-    async function loadClients() {
-      let configuredDefault = null;
-      try {
-        const res = await fetch("clients.json");
-        const data = await res.json();
-        clients = (data.clients || []).filter((c) => c && c.id && c.url);
-        configuredDefault = data.defaultClient || null;
-      } catch (err) {
-        console.error("Failed to load clients:", err);
-        // Fallback: hardcode the known clients so the launcher still works
-        // if clients.json cannot be fetched.
-        clients = [
-          {
-            id: "eagler-26.2-dev-0.6",
-            name: "Eaglercraft 26.2 Dev 0.6",
-            version: "26.2 Dev 0.6",
-            url: "Eagler-26.2-Dev-0.6.html",
-            icon: "icons/icon-192.png",
-            description: "Minecraft 26.2 in the browser",
-            author: "o_xer"
-          },
-          {
-            id: "eagler-26.2-dev-0.6-wispcraft",
-            name: "Eaglercraft 26.2 Dev 0.6 Wispcraft",
-            version: "26.2 Dev 0.6",
-            url: "Eagler-26.2-Dev-0.6-wisp.html",
-            icon: "icons/icon-192.png",
-            description: "Dev 0.6 build with Wisp for lower ping",
-            author: "o_xer"
-          },
-          {
-            id: "eagler-26.2-u2-wispcraft",
-            name: "Eaglercraft 26.2 U2 Wispcraft",
-            version: "26.2 U2",
-            url: "Eagler-26.2-U2-wisp.html",
-            icon: "icons/icon-192.png",
-            description: "Update 2 build with Wisp for lower ping",
-            author: "o_xer"
-          }
-        ];
-        configuredDefault = "eagler-26.2-dev-0.6";
-      }
+    /* --------------------------------------------------------------
+       The catalog
+       -------------------------------------------------------------- */
 
-      applyPreferences(configuredDefault);
+    // The catalog is the generated clients/index.json. The legacy
+    // clients.json is still accepted, so an older checkout keeps working.
+    async function loadClients() {
+      // One fetch at a time: the worker tells us when the catalog changed,
+      // and reacting to that must not start a second fetch on top.
+      if (catalogLoading) return;
+      catalogLoading = true;
+      let data = null;
+      let failed = false;
+      try {
+        const res = await fetch("clients/index.json", { cache: "no-cache" });
+        if (res.ok) data = await res.json();
+        else failed = true;
+      } catch (err) { failed = true; }
+
+      if (!data) {
+        try {
+          const res = await fetch("clients.json", { cache: "no-cache" });
+          if (res.ok) data = await res.json();
+        } catch (err) { /* no catalog at all */ }
+      }
+      catalogLoading = false;
+
+      if (!data) {
+        clients = [];
+        groups = [];
+        applyPreferences(null);
+        renderTree();
+        renderClients();
+        catalogMissing = failed;
+        return;
+      }
+      catalogMissing = false;
+
+      const raw = (data.clients || []).filter((c) => c && c.id && c.url);
+      clients = raw.map((c) => ({
+        id: String(c.id),
+        url: String(c.url),
+        name: c.name || "Unnamed client",
+        version: c.version || "",
+        author: c.author || "",
+        description: c.description || "",
+        icon: c.icon || "",
+        groupPath: Array.isArray(c.groupPath) ? c.groupPath : [],
+        groupLabel: c.groupLabel || "",
+        size: Number(c.size) || 0
+      }));
+      groups = (data.groups || []).map((g) => ({
+        path: String(g.path || ""),
+        label: g.label || g.path,
+        icon: g.icon || "",
+        order: Number(g.order) || 0,
+        count: Number(g.count) || 0,
+        total: Number(g.total) || 0
+      }));
+
+      // Only rebuild the list when something actually changed, so the
+      // periodic check does not throw away the selection or the scroll
+      // position.
+      const signature = catalogSignature(clients, groups);
+      if (signature === catalogSignatureValue) return;
+      catalogSignatureValue = signature;
+
+      applyPreferences(data.defaultClient || null);
+      renderTree();
       renderClients();
     }
 
-    function getOrderedClients() {
-      const originalOrder = new Map(clients.map((c, index) => [c.id, index]));
-      return [...clients].sort((a, b) => {
-        const aFavorite = favorites.has(a.id) ? 0 : 1;
-        const bFavorite = favorites.has(b.id) ? 0 : 1;
-        return aFavorite - bFavorite || originalOrder.get(a.id) - originalOrder.get(b.id);
-      });
+    function catalogSignature(list, groupList) {
+      return list.map((c) =>
+        [c.id, c.name, c.version, c.author, c.description, c.icon, c.url].join("|")
+      ).join("\n") + "\n--\n" + groupList.map((g) => g.path + "|" + g.label).join("\n");
+    }
+
+    /* --------------------------------------------------------------
+       The folder tree (sidebar)
+       -------------------------------------------------------------- */
+    let treeNodes = new Map();
+
+    function humanize(slug) {
+      return String(slug).replace(/[-_]+/g, " ").split(" ").filter(Boolean)
+        .map((w) => (/[0-9]/.test(w) ? w : w[0].toUpperCase() + w.slice(1)))
+        .join(" ");
+    }
+
+    function buildTree() {
+      const meta = new Map(groups.map((g) => [g.path, g]));
+      const root = { path: "", label: "", children: [], clients: [] };
+      const nodes = new Map([["", root]]);
+
+      function ensure(parts) {
+        const key = parts.join("/");
+        if (nodes.has(key)) return nodes.get(key);
+        const parent = ensure(parts.slice(0, -1));
+        const g = meta.get(key);
+        const node = {
+          path: key,
+          label: g ? g.label : humanize(parts[parts.length - 1]),
+          icon: g ? g.icon : "",
+          order: g ? g.order : 0,
+          children: [],
+          clients: []
+        };
+        parent.children.push(node);
+        nodes.set(key, node);
+        return node;
+      }
+
+      // Every folder gets a node, even an empty one.
+      for (const g of groups) ensure(g.path.split("/").filter(Boolean));
+      for (const c of clients) ensure(c.groupPath).clients.push(c);
+
+      const sort = (node) => {
+        node.children.sort((a, b) => (a.order - b.order) || a.label.localeCompare(b.label));
+        node.children.forEach(sort);
+      };
+      sort(root);
+      treeNodes = nodes;
+      return root;
+    }
+
+    function treeButton(label, count, selected, indent, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tree-item" + (selected ? " selected" : "");
+      button.style.paddingLeft = (8 + indent * 14) + "px";
+      const text = document.createElement("span");
+      text.className = "tree-label";
+      text.textContent = label;
+      button.appendChild(text);
+      if (count) {
+        const badge = document.createElement("span");
+        badge.className = "tree-count";
+        badge.textContent = count;
+        button.appendChild(badge);
+      }
+      button.addEventListener("click", onClick);
+      return button;
+    }
+
+    function renderTree() {
+      const root = buildTree();
+      clientTree.innerHTML = "";
+
+      clientTree.appendChild(treeButton(
+        "All clients", clients.length, activeGroup === "", 0,
+        () => { activeGroup = ""; renderTree(); renderClients(); }));
+
+      const favCount = clients.filter((c) => favorites.has(c.id)).length;
+      clientTree.appendChild(treeButton(
+        "★ Favorites", favCount, activeGroup === "favorites", 0,
+        () => { activeGroup = "favorites"; renderTree(); renderClients(); }));
+
+      const walk = (node, depth) => {
+        for (const child of node.children) {
+          clientTree.appendChild(treeButton(
+            child.label, child.clients.length, activeGroup === child.path, depth,
+            () => { activeGroup = child.path; renderTree(); renderClients(); }));
+          walk(child, depth + 1);
+        }
+      };
+      walk(root, 0);
+    }
+
+    /* --------------------------------------------------------------
+       Searching
+       -------------------------------------------------------------- */
+    function searchTokens() {
+      return searchTerm.toLowerCase().split(/\s+/).filter(Boolean);
+    }
+
+    function matchesSearch(client, tokens) {
+      if (!tokens.length) return true;
+      const haystack = [
+        client.name, client.version, client.author, client.description,
+        client.groupLabel, client.groupPath.join(" ")
+      ].filter(Boolean).join(" ").toLowerCase();
+      return tokens.every((t) => haystack.includes(t));
+    }
+
+    function visibleClients() {
+      const tokens = searchTokens();
+      let list = clients;
+      if (activeGroup === "favorites") {
+        list = list.filter((c) => favorites.has(c.id));
+      } else if (activeGroup) {
+        list = list.filter((c) => {
+          const path = (c.groupPath || []).join("/");
+          return path === activeGroup || path.startsWith(activeGroup + "/");
+        });
+      }
+      if (tokens.length) list = list.filter((c) => matchesSearch(c, tokens));
+      return list;
+    }
+
+    // Which sub-folder a client belongs to, relative to what is on screen.
+    function groupKeyFor(client) {
+      const path = client.groupPath || [];
+      if (activeGroup === "favorites") return path[0] || "";
+      const prefix = activeGroup ? activeGroup.split("/") : [];
+      if (path.length <= prefix.length) return "";
+      return path[prefix.length];
+    }
+
+    function headingLabel(key, count) {
+      if (!key) {
+        if (activeGroup === "favorites") return "Starred clients (" + count + ")";
+        if (activeGroup) {
+          // The clients that sit directly in the selected folder.
+          const meta = treeNodes.get(activeGroup);
+          return (meta ? meta.label : humanize(activeGroup)) + " (" + count + ")";
+        }
+        return "Ungrouped (" + count + ")";
+      }
+      const meta = treeNodes.get(activeGroup ? activeGroup + "/" + key : key);
+      const label = meta ? meta.label : humanize(key);
+      return label + " (" + count + ")";
+    }
+
+    /* --------------------------------------------------------------
+       The client list
+       -------------------------------------------------------------- */
+    function monogramFor(name) {
+      const words = String(name || "?").split(/\s+/).filter(Boolean);
+      if (!words.length) return "?";
+      if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+      return (words[0][0] + words[1][0]).toUpperCase();
+    }
+
+    function hueFor(id) {
+      let hash = 0;
+      const text = String(id || "");
+      for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
+      return Math.abs(hash) % 360;
+    }
+
+    function iconElement(client) {
+      const wrap = document.createElement("div");
+      wrap.className = "client-icon-wrap";
+
+      const mono = document.createElement("div");
+      mono.className = "monogram";
+      mono.textContent = monogramFor(client.name);
+      mono.style.background = "hsl(" + hueFor(client.id) + ", 42%, 34%)";
+      wrap.appendChild(mono);
+
+      if (client.icon) {
+        const img = document.createElement("img");
+        img.className = "client-icon";
+        img.src = client.icon;
+        img.alt = "";
+        img.loading = "lazy";
+        img.addEventListener("load", () => wrap.classList.add("has-icon"));
+        img.addEventListener("error", () => img.remove());
+        wrap.appendChild(img);
+      }
+      return wrap;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "";
+      const units = ["B", "KB", "MB", "GB"];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+      return (value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)) + " " + units[unit];
     }
 
     function createClientCard(c) {
       const isDefault = c.id === defaultClientId;
       const isFavorite = favorites.has(c.id);
-      const clientName = c.name || "Unnamed client";
+      const isOffline = offlineClients.has(c.url);
 
       const card = document.createElement("div");
       card.className = "client-card";
@@ -953,11 +1568,7 @@
       if (c.id === selectedClientId) card.classList.add("selected");
       if (isFavorite) card.classList.add("favorite");
 
-      const icon = document.createElement("img");
-      icon.className = "client-icon";
-      icon.src = c.icon || "icons/icon-192.png";
-      icon.alt = "";
-      icon.loading = "lazy";
+      card.appendChild(iconElement(c));
 
       const main = document.createElement("div");
       main.className = "client-main";
@@ -967,13 +1578,19 @@
 
       const name = document.createElement("span");
       name.className = "client-name";
-      name.textContent = clientName;
+      name.textContent = c.name;
       nameRow.appendChild(name);
 
       if (isDefault) {
         const badge = document.createElement("span");
         badge.className = "badge";
         badge.textContent = "Default";
+        nameRow.appendChild(badge);
+      }
+      if (isOffline) {
+        const badge = document.createElement("span");
+        badge.className = "badge offline";
+        badge.textContent = "Offline";
         nameRow.appendChild(badge);
       }
 
@@ -983,7 +1600,7 @@
 
       const desc = document.createElement("div");
       desc.className = "client-desc";
-      desc.textContent = c.description || "Eaglercraft client";
+      desc.textContent = c.description || c.groupLabel || "";
 
       main.append(nameRow, meta, desc);
 
@@ -996,20 +1613,19 @@
       favoriteBtn.dataset.action = "favorite";
       favoriteBtn.textContent = isFavorite ? "★" : "☆";
       favoriteBtn.title = isFavorite ? "Remove from favorites" : "Pin to favorites";
-      favoriteBtn.setAttribute("aria-label", isFavorite ? `Remove ${clientName} from favorites` : `Pin ${clientName} to favorites`);
+      favoriteBtn.setAttribute("aria-label", favoriteBtn.title);
       favoriteBtn.setAttribute("aria-pressed", String(isFavorite));
 
-      const defaultBtn = document.createElement("button");
-      defaultBtn.type = "button";
-      defaultBtn.className = "client-action default-btn";
-      defaultBtn.dataset.action = "default";
-      defaultBtn.textContent = isDefault ? "Default" : "Set default";
-      defaultBtn.disabled = isDefault;
-      defaultBtn.title = isDefault ? "This client opens selected when the launcher loads" : "Open this client selected when the launcher loads";
-      defaultBtn.setAttribute("aria-label", isDefault ? `${clientName} is the default client` : `Set ${clientName} as the default client`);
+      const detailsBtn = document.createElement("button");
+      detailsBtn.type = "button";
+      detailsBtn.className = "client-action details-btn";
+      detailsBtn.dataset.action = "details";
+      detailsBtn.textContent = "⋯";
+      detailsBtn.title = "Client details";
+      detailsBtn.setAttribute("aria-label", "Details for " + c.name);
 
-      actions.append(favoriteBtn, defaultBtn);
-      card.append(icon, main, actions);
+      actions.append(favoriteBtn, detailsBtn);
+      card.append(main, actions);
       return card;
     }
 
@@ -1019,16 +1635,45 @@
       if (!clients.length) {
         const empty = document.createElement("p");
         empty.className = "empty-state";
-        empty.textContent = "No clients found. Add one to clients.json.";
+        empty.textContent = catalogMissing
+          ? "The client catalog could not be loaded. It has to be fetched once while online — after that it works offline too."
+          : "No clients in the catalog. Drop a build into clients/ and run ./build-index.py.";
         clientList.appendChild(empty);
         launchBtn.disabled = true;
         launchBtn.textContent = "No clients available";
         return;
       }
 
-      getOrderedClients().forEach((c) => {
-        clientList.appendChild(createClientCard(c));
-      });
+      const list = visibleClients();
+      if (!list.length) {
+        const empty = document.createElement("p");
+        empty.className = "empty-state";
+        empty.textContent = searchTerm
+          ? "No clients match “" + searchTerm + "”."
+          : "No clients in this folder.";
+        clientList.appendChild(empty);
+        return;
+      }
+
+      // Bucket them by the sub-folder they sit in.
+      const buckets = new Map();
+      for (const c of list) {
+        const key = groupKeyFor(c);
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(c);
+      }
+
+      for (const [key, items] of buckets) {
+        items.sort((a, b) => {
+          const fav = (favorites.has(b.id) ? 1 : 0) - (favorites.has(a.id) ? 1 : 0);
+          return fav || a.name.localeCompare(b.name);
+        });
+        const heading = document.createElement("div");
+        heading.className = "group-header";
+        heading.textContent = headingLabel(key, items.length);
+        clientList.appendChild(heading);
+        for (const c of items) clientList.appendChild(createClientCard(c));
+      }
     }
 
     function selectClient(id) {
@@ -1049,7 +1694,9 @@
         favorites.add(id);
       }
       saveFavorites();
+      renderTree();
       renderClients();
+      if (modalClient && modalClient.id === id) fillModal(modalClient);
     }
 
     function setDefaultClient(id) {
@@ -1058,6 +1705,7 @@
       selectedClientId = id;
       saveDefault(id);
       renderClients();
+      if (modalClient && modalClient.id === id) fillModal(modalClient);
     }
 
     clientList.addEventListener("click", (event) => {
@@ -1067,7 +1715,10 @@
       const action = event.target.closest(".client-action");
       if (action) {
         if (action.dataset.action === "favorite") toggleFavorite(id);
-        if (action.dataset.action === "default") setDefaultClient(id);
+        if (action.dataset.action === "details") {
+          const client = clients.find((c) => c.id === id);
+          if (client) openModal(client);
+        }
         return;
       }
       selectClient(id);
@@ -1096,6 +1747,190 @@
       }
     });
 
+    clientSearch.addEventListener("input", (event) => {
+      searchTerm = event.target.value.trim();
+      renderClients();
+    });
+
+    // "/" focuses the search box, the way it works in most apps.
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+      const el = event.target;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      event.preventDefault();
+      clientSearch.focus();
+      clientSearch.select();
+    });
+
+
+    /* --------------------------------------------------------------
+       The client details modal
+       -------------------------------------------------------------- */
+    function openModal(client) {
+      modalClient = client;
+      fillModal(client);
+      clientModal.classList.add("visible");
+      clientModal.setAttribute("aria-hidden", "false");
+      const focusTarget = clientModal.querySelector("button");
+      if (focusTarget) focusTarget.focus();
+    }
+
+    function closeModal() {
+      clientModal.classList.remove("visible");
+      clientModal.setAttribute("aria-hidden", "true");
+      modalClient = null;
+    }
+
+    function fillModal(client) {
+      modalIcon.innerHTML = "";
+      modalIcon.appendChild(iconElement(client));
+      modalTitle.textContent = client.name;
+      modalMeta.textContent = [client.version, client.author].filter(Boolean).join(" · ");
+      modalDesc.textContent = client.description || "";
+      modalDesc.style.display = client.description ? "" : "none";
+
+      modalFacts.innerHTML = "";
+      const facts = [];
+      facts.push(["Folder", client.groupPath.length ? client.groupPath.join(" / ") : "—"]);
+      if (client.size) facts.push(["Size", formatBytes(client.size)]);
+      facts.push(["File", client.url]);
+      for (const [label, value] of facts) {
+        const dt = document.createElement("dt");
+        dt.textContent = label;
+        const dd = document.createElement("dd");
+        dd.textContent = value;
+        modalFacts.append(dt, dd);
+      }
+
+      const isOffline = offlineClients.has(client.url);
+      const progress = downloads.get(client.url);
+
+      modalFavorite.textContent = favorites.has(client.id) ? "★ Unfavorite" : "☆ Favorite";
+      modalDefault.textContent = client.id === defaultClientId ? "★ Default" : "Set default";
+      modalDefault.disabled = client.id === defaultClientId;
+
+      modalProgress.style.display = "none";
+      modalProgressBar.style.width = "0%";
+      modalStatus.textContent = "";
+
+      if (progress) {
+        modalProgress.style.display = "";
+        const pct = progress.total ? Math.round((progress.loaded / progress.total) * 100) : 0;
+        modalProgressBar.style.width = pct + "%";
+        modalDownload.textContent = "Downloading " + pct + "%";
+        modalDownload.disabled = true;
+      } else if (isOffline) {
+        modalDownload.textContent = "Remove offline copy";
+        modalDownload.disabled = false;
+        modalStatus.textContent = "Ready offline — " + formatBytes(offlineClients.get(client.url)) + " on disk.";
+      } else {
+        modalDownload.textContent = "Download for offline";
+        modalDownload.disabled = false;
+        modalStatus.textContent = "Not downloaded — it needs a connection every time.";
+      }
+    }
+
+    function postToWorker(message) {
+      if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+        showToast("The service worker is not active — offline downloads are unavailable.", 6000);
+        return false;
+      }
+      navigator.serviceWorker.controller.postMessage(message);
+      return true;
+    }
+
+    function downloadClient(client) {
+      if (!postToWorker({ type: "cache-client", url: client.url })) return;
+      downloads.set(client.url, { loaded: 0, total: 0 });
+      if (modalClient && modalClient.id === client.id) fillModal(client);
+    }
+
+    function removeOffline(client) {
+      downloads.delete(client.url);
+      postToWorker({ type: "uncache-client", url: client.url });
+    }
+
+    function requestOfflineStatus() {
+      postToWorker({ type: "offline-status" });
+    }
+
+    function handleOfflineStatus(msg) {
+      offlineClients = new Map((msg.clients || []).map((c) => [c.path, c.size || 0]));
+      renderClients();
+      if (modalClient) fillModal(modalClient);
+      updateOfflineSummary();
+    }
+
+    function updateOfflineSummary() {
+      let bytes = 0;
+      for (const size of offlineClients.values()) bytes += size;
+      offlineSummary.textContent = offlineClients.size
+        ? offlineClients.size + (offlineClients.size === 1 ? " client" : " clients") +
+          " · " + formatBytes(bytes)
+        : "none";
+
+      offlineList.innerHTML = "";
+      for (const [path, size] of offlineClients) {
+        const client = clients.find((c) => c.url === path);
+        const row = document.createElement("div");
+        row.className = "offline-row";
+        const name = document.createElement("span");
+        name.className = "offline-name";
+        name.textContent = client ? client.name : path;
+        const sizeEl = document.createElement("span");
+        sizeEl.className = "offline-size";
+        sizeEl.textContent = formatBytes(size);
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "offline-remove";
+        remove.textContent = "Remove";
+        remove.addEventListener("click", () => {
+          if (client) removeOffline(client);
+          else postToWorker({ type: "uncache-client", url: path });
+        });
+        row.append(name, sizeEl, remove);
+        offlineList.appendChild(row);
+      }
+    }
+
+    modalDownload.addEventListener("click", () => {
+      if (!modalClient) return;
+      if (offlineClients.has(modalClient.url)) removeOffline(modalClient);
+      else downloadClient(modalClient);
+    });
+
+    modalFavorite.addEventListener("click", () => {
+      if (modalClient) toggleFavorite(modalClient.id);
+    });
+
+    modalDefault.addEventListener("click", () => {
+      if (modalClient) setDefaultClient(modalClient.id);
+    });
+
+    document.getElementById("modal-launch").addEventListener("click", () => {
+      if (!modalClient) return;
+      launchClient(modalClient);
+    });
+
+    document.getElementById("modal-close").addEventListener("click", closeModal);
+
+    clientModal.addEventListener("click", (event) => {
+      if (event.target === clientModal) closeModal();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && clientModal.classList.contains("visible")) {
+        closeModal();
+      }
+    });
+
+    document.getElementById("offline-clear").addEventListener("click", () => {
+      for (const path of offlineClients.keys()) {
+        postToWorker({ type: "uncache-client", url: path });
+      }
+    });
+
+
     /* --------------------------------------------------------------
        Launch
        -------------------------------------------------------------- */
@@ -1113,30 +1948,86 @@
       launchLoading.classList.add("visible");
     }
 
-    // The service worker reports how much of the client has arrived.
+    // The service worker reports how much of the client has arrived, and
+    // keeps track of the offline copies.
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("message", (e) => {
         const msg = e.data || {};
-        if (msg.type !== "client-progress") return;
-        if (typeof msg.total === "number" && msg.total > 0) {
-          const pct = Math.min(100, Math.round((msg.loaded / msg.total) * 100));
-          launchProgress.classList.remove("indeterminate");
-          launchProgressBar.style.width = pct + "%";
-          launchLoadingStatus.textContent = "Downloading the client… " + pct + "%";
-        } else {
-          launchProgress.classList.add("indeterminate");
+
+        if (msg.type === "client-progress") {
+          if (typeof msg.total === "number" && msg.total > 0) {
+            const pct = Math.min(100, Math.round((msg.loaded / msg.total) * 100));
+            launchProgress.classList.remove("indeterminate");
+            launchProgressBar.style.width = pct + "%";
+            launchLoadingStatus.textContent = "Downloading the client… " + pct + "%";
+          } else {
+            launchProgress.classList.add("indeterminate");
+          }
+          return;
+        }
+
+        if (msg.type === "offline-status") {
+          handleOfflineStatus(msg);
+          return;
+        }
+
+        if (msg.type === "client-download-progress") {
+          downloads.set(msg.path, { loaded: msg.loaded || 0, total: msg.total || 0 });
+          if (modalClient && modalClient.url === msg.path) fillModal(modalClient);
+          return;
+        }
+
+        if (msg.type === "client-download-done") {
+          downloads.delete(msg.path);
+          if (msg.ok) {
+            showToast("Downloaded <strong>" + escapeHtml(clientName(msg.path)) +
+              "</strong> for offline play.");
+          } else {
+            showToast("The download failed: " + escapeHtml(msg.error || "unknown error"), 8000);
+          }
+          if (modalClient && modalClient.url === msg.path) fillModal(modalClient);
+          requestOfflineStatus();
+          return;
+        }
+
+        if (msg.type === "offline-removed") {
+          requestOfflineStatus();
+          return;
+        }
+
+        if (msg.type === "catalog-updated") {
+          // The worker refreshed the catalog in the background — pull the
+          // new list in without making the user refresh the page.
+          loadClients();
         }
       });
     }
 
+    function clientName(url) {
+      const client = clients.find((c) => c.url === url);
+      return client ? client.name : url;
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      })[ch]);
+    }
+
     launchBtn.addEventListener("click", async () => {
+      const c = clients.find((x) => x.id === selectedClientId);
+      if (!c) return;
+      await launchClient(c);
+    });
+
+    // Start a client. Shared by the Launch button and the details modal.
+    async function launchClient(c) {
+      if (!c) return;
       if (!isStandalone()) {
         // PWA enforcement: refuse to launch unless installed as a web app
         showInstallRequired();
         return;
       }
-      const c = clients.find((x) => x.id === selectedClientId);
-      if (!c) return;
       launchBtn.disabled = true;
       launchBtn.textContent = "Loading…";
       // Show the loading animation right away — the client page replaces the
@@ -1153,9 +2044,7 @@
       // both the shell and the client from cache, so navigating back returns
       // to the launcher instantly, without re-downloading anything.
       window.location.assign(c.url);
-      launchBtn.disabled = false;
-      launchBtn.textContent = "Launch Client";
-    });
+    }
 
     // Returns true when a service worker is controlling this page.
     async function ensureServiceWorker() {
@@ -1618,6 +2507,9 @@
             window.location.reload();
           };
 
+          // A new worker took over: it knows which clients are cached.
+          navigator.serviceWorker.addEventListener("controllerchange", refreshOfflineStatus);
+
           // Belt: the new worker claimed this page after an upgrade.
           if (hadController) {
             navigator.serviceWorker.addEventListener("controllerchange", reloadForUpdate);
@@ -1697,12 +2589,33 @@
       };
     })();
 
+    // Ask the worker which clients are on disk for offline play.
+    async function refreshOfflineStatus() {
+      if (!("serviceWorker" in navigator)) return;
+      try {
+        if (!navigator.serviceWorker.controller) await navigator.serviceWorker.ready;
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: "offline-status" });
+        }
+      } catch (err) { /* the worker is not there yet */ }
+    }
+
     /* --------------------------------------------------------------
        Boot
        -------------------------------------------------------------- */
     loadClients();
     registerSW();
     enforcePWA();
+    updateOfflineSummary();
+    refreshOfflineStatus();
+
+    // A client can be added while the launcher is open. The service worker
+    // refreshes the catalog in the background and tells us when it moved
+    // on; the poll is what triggers that refresh.
+    setInterval(() => {
+      if (document.hidden) return;
+      loadClients();
+    }, 60000);
 
   </script>
 </body>

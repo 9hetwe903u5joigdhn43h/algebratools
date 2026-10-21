@@ -4,3 +4,7 @@ eaglercraft26.crashJournal.v2
 eaglercraft26.lastCrashReport.v2
 crash-reports/
 *.crash.json
+
+# Python bytecode from the catalog tooling.
+__pycache__/
+*.pyc
