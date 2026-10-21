@@ -887,9 +887,54 @@
     /* --------------------------------------------------------------
        PWA install handling
        -------------------------------------------------------------- */
+    // ChromeOS/Android report "fullscreen" instead of "standalone" when an
+    // installed app is put in fullscreen, so every app-ish display mode has to
+    // count as "running as an app". A plain browser tab in F11 reports
+    // "fullscreen" too, so that case is only trusted when we know the app was
+    // installed (launchQueue only exists in app windows, and the appinstalled
+    // event leaves a flag behind).
+    const STORAGE_INSTALLED = "eaglercraft.launcher.installed";
+    const displayModeMqs = {
+      standalone: window.matchMedia("(display-mode: standalone)"),
+      minimalUi: window.matchMedia("(display-mode: minimal-ui)"),
+      windowControlsOverlay: window.matchMedia("(display-mode: window-controls-overlay)"),
+      fullscreen: window.matchMedia("(display-mode: fullscreen)")
+    };
+
+    function markInstalled() {
+      try { localStorage.setItem(STORAGE_INSTALLED, "1"); } catch (err) { /* private mode */ }
+    }
+
+    function isKnownInstalled() {
+      try { return localStorage.getItem(STORAGE_INSTALLED) === "1"; } catch (err) { return false; }
+    }
+
+    function currentDisplayMode() {
+      if (displayModeMqs.standalone.matches) return "standalone";
+      if (displayModeMqs.minimalUi.matches) return "minimal-ui";
+      if (displayModeMqs.windowControlsOverlay.matches) return "window-controls-overlay";
+      if (displayModeMqs.fullscreen.matches) return "fullscreen";
+      return "browser";
+    }
+
     function isStandalone() {
-      return window.matchMedia("(display-mode: standalone)").matches ||
-             window.navigator.standalone === true;
+      if (window.navigator.standalone === true) return true;   // iOS Safari
+      const mode = currentDisplayMode();
+      if (mode === "standalone" || mode === "minimal-ui" || mode === "window-controls-overlay") {
+        // Running as an app — remember it so a later fullscreen still counts.
+        markInstalled();
+        return true;
+      }
+      if (mode === "fullscreen") {
+        // ChromeOS reports "fullscreen" for an installed app that was put in
+        // fullscreen. A plain browser tab in F11 looks exactly the same, so
+        // only trust it when there is no evidence that the app is not
+        // installed: the flag left behind by appinstalled, or the absence of
+        // an install prompt (which only ever fires in a browser context).
+        if (isKnownInstalled()) return true;
+        return !installPromptSeen;
+      }
+      return false;
     }
 
     console.log("[PWA] script loaded");
@@ -900,7 +945,11 @@
       e.preventDefault();
       deferredInstallPrompt = e;
       promptAvailable = true;
+      installPromptSeen = true;
       showInstallUI();
+      // The browser can install this page, so we are not in an installed app
+      // window after all — re-check (an app window never gets this event).
+      applyDisplayMode();
       updateDebug();
     });
 
@@ -908,6 +957,8 @@
       console.log("[PWA] appinstalled fired");
       deferredInstallPrompt = null;
       promptAvailable = false;
+      installPromptSeen = false;
+      markInstalled();
       hideInstallUI();
       hideInstallRequired();
       if (launchBtn) {
@@ -918,6 +969,9 @@
     });
 
     let promptAvailable = false;
+    // True once the browser has offered an install prompt for this page — that
+    // only ever happens in a browser context, never in an installed app window.
+    let installPromptSeen = false;
 
     /* --------------------------------------------------------------
        Install guides — one official page per browser / OS
@@ -1091,10 +1145,10 @@
       }
     }
 
-    // Listen for display-mode changes (e.g. after install/relaunch)
-    const mq = window.matchMedia("(display-mode: standalone)");
-    mq.addEventListener("change", (e) => {
-      if (e.matches) {
+    // Re-check whenever the display mode changes (windowed <-> fullscreen on
+    // ChromeOS, install, relaunch).
+    function applyDisplayMode() {
+      if (isStandalone()) {
         pwaEnforced = false;
         enforcementMsg.classList.remove("show");
         hideInstallUI();
@@ -1104,6 +1158,10 @@
       } else {
         enforcePWA();
       }
+    }
+
+    Object.values(displayModeMqs).forEach((mq) => {
+      if (mq.addEventListener) mq.addEventListener("change", applyDisplayMode);
     });
 
     requiredInstall.addEventListener("click", installPWA);
@@ -1198,6 +1256,7 @@
         const c = document.getElementById("debug-content");
         const lines = [];
         lines.push("standalone: " + isStandalone());
+        lines.push("display-mode: " + currentDisplayMode());
         lines.push("protocol: " + location.protocol + (location.protocol === "file:" ? " (install unavailable — serve over http://localhost)" : ""));
         lines.push("deferredInstallPrompt: " + (deferredInstallPrompt ? "yes" : "no"));
         const guide = detectInstallGuide();
