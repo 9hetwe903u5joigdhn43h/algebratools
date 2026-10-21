@@ -1,6 +1,6 @@
 <html style="width:100%;height:100%;background-color:black;"><head>
 <!--launcher-shim-->
-<!-- source: client-shim.js (sha256:611ace7473d6) -->
+<!-- source: client-shim.js (sha256:ad4b7fc10b5b) -->
 <script>
 /* Launcher shim for the Eaglercraft clients.
  *
@@ -149,9 +149,10 @@
   } catch (err) { /* ignore */ }
 
   /* ------------------------------------------------------------------
-     Diagnostics panel — the launcher is replaced when a client loads, so
-     the same information is available here too: a small button in the
-     corner opens a live readout of the keyboard state.
+     Controls panel — a small button in the bottom-left corner of the
+     client opens it. It carries the controls that the game swallows
+     (fullscreen, volume, back, close) and, behind a toggle, the
+     diagnostics readout.
      ------------------------------------------------------------------ */
   try {
     function displayMode() {
@@ -174,7 +175,111 @@
       }
     }
 
-    function panelText() {
+    /* ---- master volume ------------------------------------------- */
+    var masterGain = null;
+    var masterContext = null;
+    var volume = 1;
+
+    function installAudioMaster() {
+      var Real = window.AudioContext || window.webkitAudioContext;
+      if (!Real || Real.__eaglerShimPatched) return;
+      function Wrapped() {
+        var ctx = Reflect.construct(Real, Array.prototype.slice.call(arguments), Wrapped);
+        try {
+          var gain = ctx.createGain();
+          gain.gain.value = volume;
+          gain.connect(ctx.destination);
+          masterGain = gain;
+          masterContext = ctx;
+          // Expose them: the game wraps AudioContext itself, so this is the
+          // only reliable way to find the master gain afterwards.
+          window.__eaglerMasterGain = gain;
+          window.__eaglerMasterContext = ctx;
+        } catch (err) { /* ignore */ }
+        return ctx;
+      }
+      Wrapped.prototype = Real.prototype;
+      Wrapped.__eaglerShimPatched = true;
+      window.AudioContext = Wrapped;
+      if (window.webkitAudioContext) window.webkitAudioContext = Wrapped;
+
+      // Anything that used to go straight to the speakers now goes through
+      // the master gain, so the volume buttons scale the game's sound.
+      try {
+        var proto = window.AudioNode && window.AudioNode.prototype;
+        var origConnect = proto.connect;
+        proto.connect = function (dest) {
+          var args = arguments;
+          try {
+            if (masterGain && this !== masterGain && dest && masterContext &&
+                dest === masterContext.destination) {
+              dest = masterGain;
+            }
+          } catch (err) { /* fall through */ }
+          return origConnect.apply(this, args);
+        };
+      } catch (err) { /* ignore */ }
+    }
+
+    function applyVolume() {
+      if (!masterGain) return;
+      try { masterGain.gain.value = volume; } catch (err) { /* ignore */ }
+    }
+
+    function adjustVolume(delta) {
+      volume = Math.max(0, Math.min(1, Math.round((volume + delta) * 100) / 100));
+      applyVolume();
+      refreshPanel();
+    }
+
+    /* ---- actions --------------------------------------------------- */
+    function toggleFullscreen() {
+      try {
+        var d = document;
+        if (d.fullscreenElement || d.webkitFullscreenElement) {
+          var exit = d.exitFullscreen || d.webkitExitFullscreen;
+          if (exit) { exit.call(d); return; }
+        } else {
+          var target = d.documentElement;
+          var request = target.requestFullscreen || target.webkitRequestFullscreen;
+          if (request) { request.call(target); return; }
+        }
+      } catch (err) { /* ignore */ }
+    }
+
+    function backToLauncher() {
+      try {
+        window.history.back();
+      } catch (err) {
+        window.location.href = "./index.html";
+      }
+    }
+
+    function closeTab() {
+      try {
+        window.close();
+      } catch (err) { /* ignore */ }
+      // If the browser refused to close the tab, say so.
+      setTimeout(function () {
+        if (!window.closed) {
+          flash("The browser would not close this tab — use the window buttons.");
+        }
+      }, 600);
+    }
+
+    /* ---- panel ---------------------------------------------------- */
+    var flashTimer = null;
+
+    function flash(text, ms) {
+      var el = document.getElementById("__eagler_flash");
+      if (!el) return;
+      el.textContent = text;
+      el.style.opacity = "1";
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(function () { el.style.opacity = "0"; }, ms || 2200);
+    }
+
+    function debugText() {
       var lines = [];
       lines.push("shim: active");
       lines.push("keyboard lock attempts: " + stats.lockCalls +
@@ -187,17 +292,47 @@
       lines.push("fullscreen patched: " + (stats.fullscreenPatched ? "yes" : "no"));
       lines.push("display-mode: " + displayMode());
       lines.push("worker controlling: " + (navigator.serviceWorker.controller ? "yes" : "no"));
+      lines.push("audio master: " + (masterGain ? "yes" : "no"));
       return lines.join("\n");
     }
 
+    var panelEl = null;
+    var debugEl = null;
+    var volumeEl = null;
+
+    function refreshPanel() {
+      if (!panelEl || panelEl.style.display === "none") return;
+      if (debugEl && debugEl.style.display !== "none") debugEl.textContent = debugText();
+      if (volumeEl) volumeEl.textContent = "volume " + Math.round(volume * 100) + "%";
+    }
+
+    function chip(label, onClick) {
+      var b = document.createElement("button");
+      b.textContent = label;
+      b.style.cssText = [
+        "font:600 11px/1.2 ui-monospace,Menlo,Consolas,monospace",
+        "color:#e5e7eb",
+        "background:rgba(255,255,255,0.08)",
+        "border:1px solid rgba(255,255,255,0.16)",
+        "border-radius:6px",
+        "padding:5px 8px",
+        "cursor:pointer"
+      ].join(";");
+      b.addEventListener("click", function (e) {
+        e.stopPropagation();
+        onClick();
+      });
+      return b;
+    }
+
     function buildPanel() {
-      if (!document.body || document.getElementById("__eagler_shim_panel")) return;
+      if (!document.body || document.getElementById("__eagler_panel")) return;
 
       var button = document.createElement("button");
       button.id = "__eagler_shim_btn";
       button.textContent = "⌨";
-      button.title = "Diagnostics";
-      button.setAttribute("aria-label", "Diagnostics");
+      button.title = "Controls";
+      button.setAttribute("aria-label", "Controls");
       button.style.cssText = [
         "position:fixed",
         "left:12px",
@@ -217,38 +352,87 @@
       button.addEventListener("mouseenter", function () { button.style.opacity = "1"; });
       button.addEventListener("mouseleave", function () { button.style.opacity = "0.45"; });
 
-      var panel = document.createElement("div");
-      panel.id = "__eagler_shim_panel";
-      panel.style.cssText = [
+      panelEl = document.createElement("div");
+      panelEl.id = "__eagler_panel";
+      panelEl.style.cssText = [
         "position:fixed",
         "left:12px",
         "bottom:50px",
         "z-index:2147483647",
         "display:none",
-        "max-width:min(90vw,340px)",
+        "width:min(92vw,330px)",
         "padding:10px 12px",
         "border-radius:10px",
         "border:1px solid rgba(255,255,255,0.16)",
         "background:rgba(11,15,25,0.94)",
         "color:#e5e7eb",
-        "font:12px/1.55 ui-monospace,Menlo,Consolas,monospace",
-        "white-space:pre",
-        "pointer-events:none"
+        "font:12px/1.55 ui-monospace,Menlo,Consolas,monospace"
       ].join(";");
 
-      document.body.appendChild(panel);
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
+
+      row.appendChild(chip("Fullscreen", toggleFullscreen));
+      row.appendChild(chip("Vol -", function () { adjustVolume(-0.1); }));
+      row.appendChild(chip("Vol +", function () { adjustVolume(0.1); }));
+      row.appendChild(chip("Launcher", backToLauncher));
+      row.appendChild(chip("Close", closeTab));
+      var debugBtn = chip("Debug", function () {
+        if (!debugEl) return;
+        debugEl.style.display = debugEl.style.display === "none" ? "block" : "none";
+        refreshPanel();
+      });
+      row.appendChild(debugBtn);
+
+      volumeEl = document.createElement("div");
+      volumeEl.style.cssText = "margin-top:8px;color:#9ca3af";
+      volumeEl.textContent = "volume 100%";
+
+      debugEl = document.createElement("div");
+      debugEl.style.cssText = "display:none;margin-top:8px;white-space:pre;color:#86efac";
+
+      var flashEl = document.createElement("div");
+      flashEl.id = "__eagler_flash";
+      flashEl.style.cssText =
+        "margin-top:8px;color:#fcd34d;opacity:0;transition:opacity .3s ease";
+
+      panelEl.appendChild(row);
+      panelEl.appendChild(volumeEl);
+      panelEl.appendChild(flashEl);
+      panelEl.appendChild(debugEl);
+
+      document.body.appendChild(panelEl);
       document.body.appendChild(button);
 
-      button.addEventListener("click", function () {
-        var open = panel.style.display === "none";
-        panel.style.display = open ? "block" : "none";
-        if (open) panel.textContent = panelText();
+      button.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = panelEl.style.display === "none";
+        panelEl.style.display = open ? "block" : "none";
+        if (open) refreshPanel();
       });
+      panelEl.addEventListener("click", function (e) { e.stopPropagation(); });
 
       setInterval(function () {
-        if (panel.style.display !== "none") panel.textContent = panelText();
+        if (panelEl && panelEl.style.display !== "none") refreshPanel();
       }, 1000);
     }
+
+    installAudioMaster();
+
+    // Volume keys, when the browser forwards them to the page.
+    window.addEventListener("keydown", function (e) {
+      var code = e.code || "";
+      var key = e.key || "";
+      if (code === "VolumeUp" || key === "AudioVolumeUp" || code === "XF86AudioRaiseVolume") {
+        e.preventDefault();
+        e.stopPropagation();
+        adjustVolume(0.1);
+      } else if (code === "VolumeDown" || key === "AudioVolumeDown" || code === "XF86AudioLowerVolume") {
+        e.preventDefault();
+        e.stopPropagation();
+        adjustVolume(-0.1);
+      }
+    }, true);
 
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", buildPanel, { once: true });
