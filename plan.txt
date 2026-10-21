@@ -1,0 +1,265 @@
+Immersive fullscreen for the Eaglercraft clients
+=================================================
+
+Status: plan only — not implemented yet.
+
+Goal
+----
+Right now, pressing Esc in a client drops out of fullscreen, and the next
+click puts it straight back in. That feels like the browser is fighting the
+player. The wanted behaviour is:
+
+  * a single Esc press does NOT leave fullscreen (the browser stays put),
+  * holding Esc for a moment leaves fullscreen, and it stays exited,
+  * the client enters fullscreen on its own, without a keybind.
+
+How it is going to work
+-----------------------
+Chrome eats the Esc key that exits fullscreen: the page never sees it, so
+nothing can tell "the player wants out" from "the browser bailed". That is
+why the shim currently re-enters fullscreen on the next interaction.
+
+The lever is the Keyboard Lock API, scoped to a single key. Chromium's own
+browser tests (browser/ui/views/.../keyboard_lock_interactive_browser_test)
+assert, for tab-initiated (JS API) fullscreen with `navigator.keyboard.lock(
+['Escape'])`:
+
+  * a single Escape press does not exit fullscreen,
+  * the page does receive the Escape keydown,
+  * common browser shortcuts (Ctrl+T / Ctrl+W / Ctrl+N) still work — only the
+    listed key is captured, unlike an all-keys lock,
+  * the user has to press and hold Escape to exit fullscreen,
+  * the lock only engages in tab-initiated fullscreen (not F11) and is
+    released automatically when fullscreen ends.
+
+Verified on this machine (Chromium 154.0.8037.97, /usr/bin/chromium):
+
+  navigator.keyboard                       -> present, lock() is a function
+  permissions.query({name:'keyboard-lock'})-> state "granted"
+  navigator.keyboard.lock(['Escape'])      -> resolves, no prompt, no gesture
+
+So the permission modal that was once planned for the Keyboard Lock API is
+not shipped — the scoped Escape lock can be used silently.
+
+Changes (all of them in client-shim.js)
+----------------------------------------
+
+1. Let a scoped Escape lock through the blocker.
+
+   The shim currently replaces `navigator.keyboard.lock` with a function that
+   always resolves without locking, so the game's broad lock never kills the
+   system shortcuts. The original implementation is captured before the patch
+   and kept:
+
+       var realKeyboardLock = null;
+       try { realKeyboardLock = window.Keyboard && Keyboard.prototype.lock; }
+       catch (err) { /* ignore */ }
+
+   The patched function now forwards only our own one-key request:
+
+       function patchedLock(keys) {
+         if (isEscapeOnly(keys)) {
+           escLockRequested = true;
+           return realKeyboardLock.call(navigator.keyboard, keys);
+         }
+         stats.lockCalls++;
+         saveStats();
+         warn("keyboard lock blocked — system shortcuts stay available");
+         return Promise.resolve();
+       }
+
+   `isEscapeOnly(keys)` is true when `keys` is an array whose only entry is
+   "Escape" (case-insensitive). Everything else — including the game's
+   `lock()` with no arguments — keeps being blocked.
+
+   The existing safety net ("if anything managed to lock the keyboard
+   anyway, drop it") must not drop *our* lock, so both the 500 ms poll and
+   the keydown listener are skipped while `escLockRequested` is true.
+
+2. Arm and disarm the lock with fullscreen.
+
+       function armEscLock() {
+         if (!navigator.keyboard || typeof navigator.keyboard.lock !== "function") return;
+         escLockRequested = true;
+         try {
+           var p = navigator.keyboard.lock(["Escape"]);   // passes through the patch
+           if (p && typeof p.then === "function") {
+             p.then(function () { stats.escLock = true; saveStats(); },
+                    function () { stats.escLock = false; saveStats(); });
+           }
+         } catch (err) { /* ignore */ }
+       }
+
+       function disarmEscLock() {
+         escLockRequested = false;
+         stats.escLock = false;
+         try {
+           if (navigator.keyboard && typeof navigator.keyboard.unlock === "function") {
+             navigator.keyboard.unlock();
+           }
+         } catch (err) { /* ignore */ }
+       }
+
+   `armEscLock()` is called from the `fullscreenchange` handler when
+   `isFullscreen()` is true; `disarmEscLock()` when it turns false.
+
+3. The Escape handler.
+
+   A capture-phase keydown listener on `document`, active only while we are
+   in fullscreen:
+
+       var ESC_HOLD_MS = 600;
+       var escHeld = false;      // Esc is physically down
+       var escHoldTimer = null;
+
+       document.addEventListener("keydown", safe(function (e) {
+         if (e.key !== "Escape" && e.code !== "Escape") return;
+         if (!isFullscreen()) return;
+
+         if (e.repeat) {
+           // Swallow the auto-repeat while Esc is held, so the in-game menu
+           // does not flicker open and closed during the hold.
+           if (escHeld) { e.preventDefault(); e.stopPropagation(); }
+           return;
+         }
+
+         escHeld = true;
+         clearTimeout(escHoldTimer);
+         escHoldTimer = setTimeout(safe(function () {
+           escHoldTimer = null;
+           // An intentional exit: do not let the sticky re-enter undo it.
+           wantFullscreen = false;
+           reenterPending = false;
+           exitFullscreen();
+         }), ESC_HOLD_MS);
+       }), true);
+
+       document.addEventListener("keyup", safe(function (e) {
+         if (e.key !== "Escape" && e.code !== "Escape") return;
+         escHeld = false;
+         clearTimeout(escHoldTimer);
+         escHoldTimer = null;
+       }), true);
+
+   The first Escape keydown is *not* stopped, so the game still receives it
+   and opens its own menu (the pause menu). Only the auto-repeat is
+   swallowed.
+
+   The hold timer is what leaves fullscreen. Chromium has its own hold-to-exit
+   as a backstop; if the browser exits first, the `fullscreenchange` handler
+   below sees a hold in progress and treats the exit as intentional.
+
+4. Fullscreen bookkeeping in the `fullscreenchange` handler.
+
+   Current behaviour: any exit while `wantFullscreen` is true sets
+   `reenterPending`, and the next mousedown/touchstart/keydown re-enters
+   fullscreen. That stays as the fallback for browsers without the Keyboard
+   Lock API (Firefox), but an exit caused by an Escape hold must not be
+   undone:
+
+       document.addEventListener("fullscreenchange", safe(function () {
+         if (isFullscreen()) {
+           reenterPending = false;
+           armEscLock();
+         } else {
+           disarmEscLock();
+           if (wantFullscreen) {
+             if (escHeld) {
+               // The browser left fullscreen as part of the Escape hold.
+               wantFullscreen = false;
+               reenterPending = false;
+             } else {
+               // No key was seen (no lock support, or an unrelated exit):
+               // keep the old sticky behaviour.
+               reenterPending = true;
+             }
+           }
+         }
+         refreshPanel();
+       }));
+
+   Note: `escHeld` is only ever true when the Escape keydown actually
+   reached the page, which only happens while the scoped lock is engaged.
+
+5. Auto fullscreen on the first interaction.
+
+   One-shot capture-phase handlers; `requestFullscreen()` still runs inside
+   the user gesture, so Chrome allows it:
+
+       var autoFullscreenDone = false;
+
+       function autoFullscreen(e) {
+         if (autoFullscreenDone) return;
+         autoFullscreenDone = true;
+         if (isFullscreen()) return;
+         wantFullscreen = true;
+         requestFullscreen();
+       }
+
+       document.addEventListener("pointerdown", safe(autoFullscreen), true);
+       document.addEventListener("keydown", safe(autoFullscreen), true);
+
+   The shim runs before the game's own scripts, so it sees the first click
+   on the game's main menu and goes fullscreen there. It only fires once, and
+   it is a no-op if the page is already fullscreen.
+
+6. Diagnostics.
+
+   The debug readout (Alt+`) gains two lines:
+
+       esc lock: yes|no
+       hold to exit: 600ms
+
+   `stats` gains `escLock: false`, saved with the other counters so the
+   launcher can read it back.
+
+Nothing else changes
+--------------------
+No UI changes: the ⚙ corner button, the control panel, the cursor and the
+flash messages stay exactly as they are. The existing keybinds keep their
+meaning:
+
+  | Action                | Default   |
+  |-----------------------|-----------|
+  | Fullscreen on         | Alt+]     |
+  | Fullscreen off        | Alt+[     |
+  | Back to the launcher  | Alt+\     |
+  | Toggle the debug panel| Alt+`     |
+
+Alt+[ still leaves fullscreen immediately and permanently (it sets
+`wantFullscreen = false` before exiting), and the panel's Fullscreen button
+still toggles.
+
+Files to touch when implementing
+--------------------------------
+  client-shim.js   the whole change above
+  sw.js            bump CACHE_NAME (v7 -> v8) so the precached copy of the
+                   shim is replaced and the clients pick it up without
+                   re-downloading the 75 MB builds
+  Eagler-*.html    regenerated with ./inject-shim.py (three builds, the shim
+                   is inlined right after <head>)
+  README.md        document the new Escape rule
+
+Manual test after implementing
+------------------------------
+  1. Launch a client: it should go fullscreen on the first click.
+  2. Tap Esc once: the in-game menu opens, the screen stays fullscreen, no
+     flicker, and the next click does not re-enter or exit anything.
+  3. Hold Esc for ~0.6 s: fullscreen exits and stays exited; the next click
+     must not bring it back.
+  4. Alt+]: fullscreen again, Esc behaves as in 2/3.
+  5. Alt+[: fullscreen exits.
+  6. Alt+`: the debug readout shows "esc lock: yes".
+
+Fallbacks and risks
+-------------------
+  * No Keyboard Lock API (Firefox): the page never sees Escape, the browser
+    exits fullscreen on its own and the old sticky re-enter applies. The
+    debug readout shows "esc lock: no".
+  * The scoped lock captures Escape only, so Ctrl+W / Ctrl+T / Ctrl+N and the
+    ChromeOS media keys keep working — that was the reason the shim blocks
+    the game's broad lock in the first place.
+  * Chromium only engages the lock in JS-API fullscreen. F11 fullscreen is
+    a separate browser mode and is unaffected.
+  * The game now receives Escape while fullscreen (it never did before),
+    which is what makes the in-game pause menu usable in fullscreen.
