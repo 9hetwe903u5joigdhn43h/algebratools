@@ -37,7 +37,10 @@
 
   // Diagnostics: the launcher reads these back so we can tell whether the
   // shim actually ran, and whether the game tried to lock the keyboard.
-  var stats = { time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false, fullscreenPatched: false };
+  var stats = {
+    time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false,
+    fullscreenPatched: false, fsRequests: 0, fsOk: 0, fsError: "", escapeKeys: 0
+  };
 
   function saveStats() {
     try { localStorage.setItem("eaglercraft.shim", JSON.stringify(stats)); } catch (err) { /* ignore */ }
@@ -197,18 +200,55 @@
     }
 
     /* ---- actions --------------------------------------------------- */
+    // Chrome exits fullscreen on Escape and a page cannot prevent that, so
+    // fullscreen is "sticky": once it is wanted, an accidental Escape is
+    // undone on the next interaction.
+    var wantFullscreen = false;
+    var reenterPending = false;
+
+    function isFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function requestFullscreen() {
+      try {
+        var target = document.documentElement;
+        var request = target.requestFullscreen || target.webkitRequestFullscreen;
+        if (request) {
+          stats.fsRequests++;
+          var result = request.call(target);
+          if (result && typeof result.then === "function") {
+            result.then(function () {
+              stats.fsOk++;
+              saveStats();
+            }, function (err) {
+              stats.fsError = String((err && err.message) || err);
+              saveStats();
+            });
+          }
+        }
+      } catch (err) {
+        stats.fsError = String((err && err.message) || err);
+        saveStats();
+      }
+    }
+
     function toggleFullscreen() {
       try {
-        var d = document;
-        if (d.fullscreenElement || d.webkitFullscreenElement) {
-          var exit = d.exitFullscreen || d.webkitExitFullscreen;
-          if (exit) { exit.call(d); return; }
+        var on = isFullscreen();
+        wantFullscreen = !on;
+        if (on) {
+          var exit = document.exitFullscreen || document.webkitExitFullscreen;
+          if (exit) exit.call(document);
         } else {
-          var target = d.documentElement;
-          var request = target.requestFullscreen || target.webkitRequestFullscreen;
-          if (request) { request.call(target); return; }
+          requestFullscreen();
         }
       } catch (err) { /* ignore */ }
+    }
+
+    function reenterFullscreen() {
+      if (!wantFullscreen || isFullscreen()) return;
+      requestFullscreen();
     }
 
     function backToLauncher() {
@@ -254,6 +294,9 @@
       lines.push("lock patched: " + (navigator.keyboard &&
         navigator.keyboard.lock.toString().indexOf("blocked") !== -1 ? "yes" : "no"));
       lines.push("fullscreen patched: " + (stats.fullscreenPatched ? "yes" : "no"));
+      lines.push("fullscreen wanted: " + (wantFullscreen ? "yes" : "no"));
+      lines.push("fullscreen requests: " + stats.fsRequests +
+        " ok " + stats.fsOk + (stats.fsError ? " (" + stats.fsError + ")" : ""));
       lines.push("display-mode: " + displayMode());
       lines.push("worker controlling: " + (navigator.serviceWorker.controller ? "yes" : "no"));
       lines.push("audio master: " + (masterGain ? "yes" : "no"));
@@ -268,6 +311,9 @@
       if (!panelEl || panelEl.style.display === "none") return;
       if (debugEl && debugEl.style.display !== "none") debugEl.textContent = debugText();
       if (volumeEl) volumeEl.textContent = "volume " + Math.round(volume * 100) + "%";
+      if (fsLabel) {
+        fsLabel.textContent = isFullscreen() ? "Exit fullscreen" : "Fullscreen";
+      }
     }
 
     function chip(label, onClick) {
@@ -337,10 +383,7 @@
       row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
 
       row.appendChild(chip("Fullscreen", toggleFullscreen));
-      row.appendChild(chip("Vol -", function () { adjustVolume(-0.1); }));
-      row.appendChild(chip("Vol +", function () { adjustVolume(0.1); }));
-      row.appendChild(chip("Launcher", backToLauncher));
-      row.appendChild(chip("Close", closeTab));
+      var fsLabel = row.lastChild;
       var debugBtn = chip("Debug", function () {
         if (!debugEl) return;
         debugEl.style.display = debugEl.style.display === "none" ? "block" : "none";
@@ -382,6 +425,30 @@
     }
 
     installAudioMaster();
+
+    // Sticky fullscreen. Chrome exits fullscreen when Escape is pressed and
+    // it never delivers that key to the page, so the exit cannot be
+    // intercepted. What we can do is notice the exit and put fullscreen back
+    // on the very next interaction, so an accidental Escape only costs one
+    // keypress.
+    document.addEventListener("fullscreenchange", function () {
+      if (isFullscreen()) {
+        reenterPending = false;
+      } else if (wantFullscreen) {
+        reenterPending = true;
+      }
+      refreshPanel();
+    });
+
+    function restoreFullscreen() {
+      if (!reenterPending) return;
+      reenterPending = false;
+      if (wantFullscreen && !isFullscreen()) requestFullscreen();
+    }
+
+    document.addEventListener("mousedown", restoreFullscreen, true);
+    document.addEventListener("touchstart", restoreFullscreen, true);
+    document.addEventListener("keydown", restoreFullscreen, true);
 
     // Volume keys, when the browser forwards them to the page.
     window.addEventListener("keydown", function (e) {
