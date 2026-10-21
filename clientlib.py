@@ -358,6 +358,25 @@ def write_catalog(catalog, path=None) -> pathlib.Path:
     return path
 
 
+def stamp_catalog(catalog, path=None):
+    """Set the 'generated' stamp, but only when the catalog really changed.
+
+    Without this every rebuild would produce a diff (just the timestamp),
+    which would make the automated workflow commit on every push.
+    """
+    path = pathlib.Path(path) if path else INDEX_PATH
+    previous = load_json(path) or {}
+    old_stamp = previous.get("generated", "")
+    old_body = {k: v for k, v in previous.items() if k != "generated"}
+    new_body = {k: v for k, v in catalog.items() if k != "generated"}
+    if old_stamp and old_body == new_body:
+        catalog["generated"] = old_stamp
+    else:
+        catalog["generated"] = datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%dT%H:%M:%SZ")
+    return catalog
+
+
 def rebuild_catalog(inject_shims=True):
     """Inject the shim into the builds and write the catalog.
 
@@ -369,7 +388,6 @@ def rebuild_catalog(inject_shims=True):
         updated, _uptodate, skipped = inject_all()
 
     catalog, problems = build_catalog()
-    catalog["generated"] = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ")
+    stamp_catalog(catalog)
     path = write_catalog(catalog)
     return catalog, path, updated, skipped, problems

@@ -13,7 +13,6 @@ at any time without touching the launcher.
 """
 
 import argparse
-import datetime
 import json
 import sys
 
@@ -70,9 +69,9 @@ def main() -> int:
         print("up to date: clients/index.json")
         return 0
 
-    # 3. Write it.
-    catalog["generated"] = datetime.datetime.now(datetime.timezone.utc).strftime(
-        "%Y-%m-%dT%H:%M:%SZ")
+    # 3. Write it. The timestamp only moves when the content really changed,
+    #    so a rebuild that finds nothing to do leaves the file alone.
+    clientlib.stamp_catalog(catalog)
     path = clientlib.write_catalog(catalog)
     print(f"wrote {path.relative_to(clientlib.HERE)}: "
           f"{len(catalog['clients'])} clients in {len(catalog['groups'])} groups")

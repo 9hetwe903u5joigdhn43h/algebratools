@@ -1,0 +1,74 @@
+name: Rebuild client catalog
+
+# The catalog (clients/index.json) is generated from the clients/ folder, so
+# it has to be regenerated whenever a build, a sidecar or the shim changes.
+# This workflow does that and commits the result, so nobody has to remember
+# to run ./build-index.py by hand.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One run per branch at a time — a second push while the first is still
+# going replaces it.
+concurrency:
+  group: catalog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Injects the shim into every build and writes clients/index.json.
+      # Only the standard library is needed.
+      - name: Rebuild the catalog
+        run: ./build-index.py
+
+      - name: Show what changed
+        run: git --no-pager diff --stat -- clients/
+
+      - name: Commit the catalog
+        # Only on a push: on a pull request the job just reports that the
+        # catalog is stale, without touching the branch.
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet -- clients/; then
+            echo "The catalog was already up to date — nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add clients/
+          # [skip ci] stops this commit from starting the workflow all over
+          # again.
+          git commit -m "chore: rebuild the client catalog [skip ci]"
+          git push
+
+      - name: Fail if the catalog is out of date
+        # On a pull request this is the point: the catalog has to be
+        # regenerated and committed for the change to be complete.
+        if: github.event_name != 'push'
+        run: |
+          if git diff --quiet -- clients/; then
+            echo "The catalog is up to date."
+          else
+            echo "::error::The client catalog is out of date. Run ./build-index.py and commit clients/index.json."
+            git --no-pager diff -- clients/index.json
+            exit 1
+          fi
