@@ -1,0 +1,32 @@
+{
+  "clients": [
+    {
+      "id": "eagler-26.2-dev-0.6",
+      "name": "Eaglercraft 26.2 Dev 0.6",
+      "version": "26.2 Dev 0.6",
+      "url": "Eagler-26.2-Dev-0.6.html",
+      "icon": "icons/icon-192.png",
+      "description": "Minecraft 26.2 in the browser",
+      "author": "o_xer"
+    },
+    {
+      "id": "eagler-26.2-dev-0.6-wispcraft",
+      "name": "Eaglercraft 26.2 Dev 0.6 Wispcraft",
+      "version": "26.2 Dev 0.6",
+      "url": "Eagler-26.2-Dev-0.6-wisp.html",
+      "icon": "icons/icon-192.png",
+      "description": "Dev 0.6 build with Wisp for lower ping",
+      "author": "o_xer"
+    },
+    {
+      "id": "eagler-26.2-u2-wispcraft",
+      "name": "Eaglercraft 26.2 U2 Wispcraft",
+      "version": "26.2 U2",
+      "url": "Eagler-26.2-U2-wisp.html",
+      "icon": "icons/icon-192.png",
+      "description": "Update 2 build with Wisp for lower ping",
+      "author": "o_xer"
+    }
+  ],
+  "defaultClient": "eagler-26.2-dev-0.6"
+}
