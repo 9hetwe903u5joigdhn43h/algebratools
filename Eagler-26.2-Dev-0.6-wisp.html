@@ -1,6 +1,6 @@
 <html style="width:100%;height:100%;background-color:black;"><head>
 <!--launcher-shim-->
-<!-- source: client-shim.js (sha256:236115e66cfa) -->
+<!-- source: client-shim.js (sha256:1a3075d08f39) -->
 <script>
 /* Launcher shim for the Eaglercraft clients.
  *
@@ -387,6 +387,7 @@
       row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
 
       row.appendChild(chip("Fullscreen", toggleFullscreen));
+      row.appendChild(chip("Launcher", backToLauncher));
       var fsLabel = row.lastChild;
       var debugBtn = chip("Debug", function () {
         if (!debugEl) return;

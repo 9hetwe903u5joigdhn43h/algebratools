@@ -383,6 +383,7 @@
       row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
 
       row.appendChild(chip("Fullscreen", toggleFullscreen));
+      row.appendChild(chip("Launcher", backToLauncher));
       var fsLabel = row.lastChild;
       var debugBtn = chip("Debug", function () {
         if (!debugEl) return;
