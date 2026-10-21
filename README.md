@@ -32,29 +32,3 @@ Notes:
 - Each client load is a large download, so Pages bandwidth adds up — the
   browser caches the file after the first fetch.
 
-## Keyboard shortcuts while a client is running
-
-The client builds swallow key events, so `client-hotkeys.js` is injected into
-each `Eagler-*.html` (see `inject-hotkeys.py`) to give the browser-level keys
-back:
-
-| Key | Action |
-|---|---|
-| `F11` | toggle fullscreen |
-| `F5` / `Ctrl+R` | reload the client |
-| `Alt+←` | back to the launcher |
-| `F7` / `F6` (or the volume keys) | volume up / down |
-| `F8` (or the mute key) | mute toggle |
-
-A short hint appears in the corner for the first few seconds after a client
-starts, and the volume level is shown whenever it changes.
-
-To change the shortcuts, edit `client-hotkeys.js` and re-run:
-
-```
-./inject-hotkeys.py
-```
-
-Bump `CLIENT_CACHE` in `sw.js` when you do, so browsers pick up the new build
-instead of serving the cached copy.
-

@@ -30,10 +30,9 @@ const ASSETS = [
 
 // Client HTML files are cached on demand (they are large wasm bundles).
 // Do NOT rename this when bumping CACHE_NAME: renaming would force a
-// ~75 MB client re-download for nothing. Bump it when a client build itself
-// changes (e.g. after injecting the launcher hotkeys), so the old build is
-// dropped and the new one is fetched once.
-const CLIENT_CACHE = "eaglercraft-clients-v3";
+// ~75 MB client re-download for nothing. Bump it only when a client build
+// itself changes, so the old build is dropped and the new one is fetched once.
+const CLIENT_CACHE = "eaglercraft-clients-v2";
 
 // Launcher shell URLs (resolved against this SW's scope). Navigations to
 // these are served network-first; every other navigation is cache-first.
