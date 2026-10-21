@@ -271,8 +271,10 @@
     }
 
     .client-card:focus-visible {
+      /* Inset, so the ring follows the rounded corners instead of floating
+         2px away from the card as a detached rounded rectangle. */
       outline: 2px solid var(--accent);
-      outline-offset: 2px;
+      outline-offset: -2px;
     }
 
     .client-card.selected {
