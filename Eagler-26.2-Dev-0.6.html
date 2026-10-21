@@ -2,7 +2,7 @@
 <html style="width:100%;height:100%;background-color:black;">
 <head>
 <!--launcher-shim-->
-<!-- source: client-shim.js (sha256:f78c36decee6) -->
+<!-- source: client-shim.js (sha256:611ace7473d6) -->
 <script>
 /* Launcher shim for the Eaglercraft clients.
  *
@@ -43,7 +43,7 @@
 
   // Diagnostics: the launcher reads these back so we can tell whether the
   // shim actually ran, and whether the game tried to lock the keyboard.
-  var stats = { time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false };
+  var stats = { time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false, fullscreenPatched: false };
 
   function saveStats() {
     try { localStorage.setItem("eaglercraft.shim", JSON.stringify(stats)); } catch (err) { /* ignore */ }
@@ -151,6 +151,115 @@
   } catch (err) { /* ignore */ }
 
   /* ------------------------------------------------------------------
+     Diagnostics panel — the launcher is replaced when a client loads, so
+     the same information is available here too: a small button in the
+     corner opens a live readout of the keyboard state.
+     ------------------------------------------------------------------ */
+  try {
+    function displayMode() {
+      try {
+        if (window.matchMedia("(display-mode: standalone)").matches) return "standalone";
+        if (window.matchMedia("(display-mode: fullscreen)").matches) return "fullscreen";
+        if (window.matchMedia("(display-mode: minimal-ui)").matches) return "minimal-ui";
+        if (window.matchMedia("(display-mode: window-controls-overlay)").matches) {
+          return "window-controls-overlay";
+        }
+      } catch (err) { /* ignore */ }
+      return "browser";
+    }
+
+    function isLocked() {
+      try {
+        return !!(navigator.keyboard && navigator.keyboard.locked);
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function panelText() {
+      var lines = [];
+      lines.push("shim: active");
+      lines.push("keyboard lock attempts: " + stats.lockCalls +
+        (stats.lockCalls ? "  (blocked)" : ""));
+      lines.push("locks released: " + stats.unlockCalls);
+      lines.push("locked right now: " + (isLocked() ? "YES" : "no"));
+      lines.push("keyboard api: " + (typeof navigator.keyboard));
+      lines.push("lock patched: " + (navigator.keyboard &&
+        navigator.keyboard.lock.toString().indexOf("blocked") !== -1 ? "yes" : "no"));
+      lines.push("fullscreen patched: " + (stats.fullscreenPatched ? "yes" : "no"));
+      lines.push("display-mode: " + displayMode());
+      lines.push("worker controlling: " + (navigator.serviceWorker.controller ? "yes" : "no"));
+      return lines.join("\n");
+    }
+
+    function buildPanel() {
+      if (!document.body || document.getElementById("__eagler_shim_panel")) return;
+
+      var button = document.createElement("button");
+      button.id = "__eagler_shim_btn";
+      button.textContent = "⌨";
+      button.title = "Diagnostics";
+      button.setAttribute("aria-label", "Diagnostics");
+      button.style.cssText = [
+        "position:fixed",
+        "left:12px",
+        "bottom:12px",
+        "z-index:2147483647",
+        "width:30px",
+        "height:30px",
+        "border-radius:8px",
+        "border:1px solid rgba(255,255,255,0.16)",
+        "background:rgba(11,15,25,0.72)",
+        "color:#9ca3af",
+        "font:600 14px/1 ui-monospace,Menlo,Consolas,monospace",
+        "cursor:pointer",
+        "opacity:0.45",
+        "transition:opacity .15s ease"
+      ].join(";");
+      button.addEventListener("mouseenter", function () { button.style.opacity = "1"; });
+      button.addEventListener("mouseleave", function () { button.style.opacity = "0.45"; });
+
+      var panel = document.createElement("div");
+      panel.id = "__eagler_shim_panel";
+      panel.style.cssText = [
+        "position:fixed",
+        "left:12px",
+        "bottom:50px",
+        "z-index:2147483647",
+        "display:none",
+        "max-width:min(90vw,340px)",
+        "padding:10px 12px",
+        "border-radius:10px",
+        "border:1px solid rgba(255,255,255,0.16)",
+        "background:rgba(11,15,25,0.94)",
+        "color:#e5e7eb",
+        "font:12px/1.55 ui-monospace,Menlo,Consolas,monospace",
+        "white-space:pre",
+        "pointer-events:none"
+      ].join(";");
+
+      document.body.appendChild(panel);
+      document.body.appendChild(button);
+
+      button.addEventListener("click", function () {
+        var open = panel.style.display === "none";
+        panel.style.display = open ? "block" : "none";
+        if (open) panel.textContent = panelText();
+      });
+
+      setInterval(function () {
+        if (panel.style.display !== "none") panel.textContent = panelText();
+      }, 1000);
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", buildPanel, { once: true });
+    } else {
+      buildPanel();
+    }
+  } catch (err) { /* ignore */ }
+
+  /* ------------------------------------------------------------------
      2. Element fullscreen -> window fullscreen
      ------------------------------------------------------------------ */
   try {
@@ -162,6 +271,8 @@
         return requestFullscreen.apply(this, arguments);
       }
     };
+    stats.fullscreenPatched = true;
+    saveStats();
   } catch (err) {
     warn("could not patch requestFullscreen:", err);
   }
