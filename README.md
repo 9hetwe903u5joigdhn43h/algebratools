@@ -117,6 +117,24 @@ The shim injection is idempotent: the block is marked with
 without a `<head>` tag is skipped and reported — it never stops the other
 builds from being updated.
 
+### The GitHub workflow
+
+`.github/workflows/rebuild-catalog.yml` runs `./build-index.py` on every
+push to `main` and commits the result, so nobody has to remember to run it
+by hand. Push a build with its sidecar and the catalog catches up.
+
+- The commit it makes carries `[skip ci]`, so it does not start the
+  workflow all over again.
+- The `generated` timestamp in the catalog only moves when the content
+  really changes, so a push that touches nothing in `clients/` leaves the
+  file alone and the workflow has nothing to commit.
+- On a pull request the workflow does not commit — it fails when the
+  catalog is out of date, so the reviewer knows it has to be regenerated.
+
+The workflow pushes to the branch it was triggered on, so `main` has to
+allow pushes from GitHub Actions (Settings → Actions → General → Workflow
+permissions, and the branch protection rules if you have any).
+
 ### The shim
 
 `client-shim.js` is injected by the service worker while it serves an app
