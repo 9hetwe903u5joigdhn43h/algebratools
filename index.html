@@ -109,6 +109,116 @@
       margin-bottom: 14px;
     }
 
+    .section-head-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .section-head-text {
+      min-width: 0;
+    }
+
+    .icon-btn {
+      flex: 0 0 auto;
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .icon-btn:hover {
+      color: var(--text);
+      border-color: #374151;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .icon-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    /* Settings panel */
+    #settings-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(2, 6, 12, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #settings-panel.visible { display: flex; }
+
+    .settings-card {
+      width: min(100%, 420px);
+      max-height: 100%;
+      overflow-y: auto;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .settings-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .settings-head h2 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .settings-note {
+      margin: 0 0 8px;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 0;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.9rem;
+    }
+
+    .setting-row select,
+    .setting-row input[type="number"] {
+      background: #0b1120;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+
+    .setting-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--accent);
+    }
+
     .section-title {
       margin: 0 0 4px 0;
       font-size: 1rem;
@@ -536,12 +646,16 @@
 
     <div class="card">
       <div class="section-head">
-        <h2 class="section-title">Clients</h2>
-        <p class="section-sub">Star a client to pin it to the top. The default client opens selected when the launcher loads.</p>
+        <div class="section-head-row">
+          <div class="section-head-text">
+            <h2 class="section-title">Clients</h2>
+            <p class="section-sub">Star a client to pin it to the top. The default client opens selected when the launcher loads.</p>
+          </div>
+          <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+        </div>
       </div>
       <div class="client-list" id="client-list" role="listbox" aria-label="Eaglercraft clients"></div>
       <button class="btn" id="launch-btn">Launch Client</button>
-      <button class="btn secondary compact" id="install-btn">Install PWA</button>
     </div>
 
     <div class="enforced" id="enforcement-msg">
@@ -564,6 +678,37 @@
     <div class="msg">Install <strong>Eaglercraft Launcher</strong> to play offline and launch clients fullscreen.</div>
     <button class="btn secondary compact" id="banner-install">Install</button>
     <button class="close" id="banner-close">&times;</button>
+  </div>
+
+  <!-- Settings -->
+  <div id="settings-panel" aria-hidden="true">
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="settings-head">
+        <h2 id="settings-title">Settings</h2>
+        <button class="icon-btn" id="settings-close" aria-label="Close settings">&#10005;</button>
+      </div>
+      <p class="settings-note">These settings are placeholders for now — nothing is saved yet.</p>
+      <label class="setting-row">
+        <span>Placeholder: show client descriptions</span>
+        <input type="checkbox" id="setting-show-descriptions" checked />
+      </label>
+      <label class="setting-row">
+        <span>Placeholder: default display mode</span>
+        <select id="setting-display-mode">
+          <option value="fullscreen">Fullscreen</option>
+          <option value="windowed">Windowed</option>
+          <option value="auto">Automatic</option>
+        </select>
+      </label>
+      <label class="setting-row">
+        <span>Placeholder: launcher volume</span>
+        <input type="number" id="setting-volume" min="0" max="100" step="5" value="100" />
+      </label>
+      <label class="setting-row">
+        <span>Placeholder: confirm before launching</span>
+        <input type="checkbox" id="setting-confirm-launch" />
+      </label>
+    </div>
   </div>
 
   <!-- Transient status message -->
@@ -591,7 +736,6 @@
 
     const clientList = document.getElementById("client-list");
     const launchBtn = document.getElementById("launch-btn");
-    const installBtn = document.getElementById("install-btn");
     const banner = document.getElementById("install-banner");
     const bannerInstall = document.getElementById("banner-install");
     const bannerClose = document.getElementById("banner-close");
@@ -1070,14 +1214,10 @@
 
     function showInstallUI() {
       if (isStandalone()) return;
-      installBtn.style.display = "block";
-      installBtn.textContent = "Install PWA";
       banner.classList.add("show");
     }
 
     function hideInstallUI() {
-      installBtn.style.display = "none";
-      installBtn.textContent = "Install PWA";
       banner.classList.remove("show");
     }
 
@@ -1117,9 +1257,38 @@
       updateDebug();
     }
 
-    installBtn.addEventListener("click", installPWA);
     bannerInstall.addEventListener("click", installPWA);
     bannerClose.addEventListener("click", () => banner.classList.remove("show"));
+
+    /* --------------------------------------------------------------
+       Settings
+       -------------------------------------------------------------- */
+    const settingsBtn = document.getElementById("settings-btn");
+    const settingsPanel = document.getElementById("settings-panel");
+    const settingsClose = document.getElementById("settings-close");
+
+    function openSettings() {
+      settingsPanel.classList.add("visible");
+      settingsPanel.setAttribute("aria-hidden", "false");
+    }
+
+    function closeSettings() {
+      settingsPanel.classList.remove("visible");
+      settingsPanel.setAttribute("aria-hidden", "true");
+    }
+
+    if (settingsBtn) settingsBtn.addEventListener("click", openSettings);
+    if (settingsClose) settingsClose.addEventListener("click", closeSettings);
+    if (settingsPanel) {
+      settingsPanel.addEventListener("click", (e) => {
+        if (e.target === settingsPanel) closeSettings();
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && settingsPanel && settingsPanel.classList.contains("visible")) {
+        closeSettings();
+      }
+    });
 
     /* --------------------------------------------------------------
        PWA enforcement

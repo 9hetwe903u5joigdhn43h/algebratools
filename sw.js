@@ -73,6 +73,7 @@ self.addEventListener("activate", (event) => {
 // ---------------------------------------------------------------------------
 const SHIM_PATH = "./client-shim.js";
 let shimPromise = null;
+let shimSource = null;
 
 // Wrap the shim source in a script tag so the browser executes it.
 function wrapShim(source) {
@@ -80,25 +81,27 @@ function wrapShim(source) {
   return "<script>\n" + source.replace(/<\/script/gi, "<\\/script") + "\n</script>\n";
 }
 
+// Network first, so an updated shim is picked up without re-downloading the
+// clients; the precached copy is the offline fallback. A service worker's own
+// fetches do not re-enter its fetch handler, so this hits the server directly.
 function getShimHtml() {
   if (!shimPromise) {
     shimPromise = (async () => {
       const url = new URL(SHIM_PATH, self.registration.scope).href;
-      // Network first: a service worker's own fetches do not re-enter its
-      // fetch handler, so this goes straight to the server and picks up an
-      // updated shim. Offline, fall back to the precached copy.
       try {
         const fresh = await fetch(url, { cache: "no-cache" });
-        if (fresh.ok) return wrapShim(await fresh.text());
-      } catch (err) { /* offline — use the cached copy */ }
+        if (fresh.ok) {
+          shimSource = await fresh.text();
+          return;
+        }
+      } catch (err) { /* offline — use the precached copy */ }
       try {
         const cached = await caches.match(url);
-        if (cached) return wrapShim(await cached.text());
+        if (cached) shimSource = await cached.text();
       } catch (err) { /* no shim available */ }
-      return "";
     })();
   }
-  return shimPromise;
+  return shimPromise.then(() => wrapShim(shimSource || ""));
 }
 
 // Insert the shim right after <head> so it runs before the game's scripts.
@@ -184,24 +187,25 @@ self.addEventListener("fetch", (event) => {
           }
         }
         // Client pages: cache-first (they are stored on demand the first time
-        // they are opened), then network — and the network copy is stored so
-        // the next launch works offline. The stored copy already carries the
-        // shim, so an offline launch is patched too. Last resort: the cached
-        // shell.
-        if (cached) return cached;
+        // they are opened), then network. The cached copy is the pristine
+        // build; the shim is injected on the way out every time, so a cached
+        // client can never bypass it and a new shim is picked up without
+        // re-downloading 75 MB. Last resort: the cached shell.
+        const shimPromise = getShimHtml();
+        if (cached) return injectShim(cached, await shimPromise);
         try {
-          const fresh = await fetch(request);
+          // Start the download and the shim fetch together.
+          const download = fetch(request);
+          const shimHtml = await shimPromise;
+          const fresh = await download;
           if (fresh.ok && fresh.type === "basic") {
-            const shimHtml = await getShimHtml();
-            // One tee only: the cache write and the page both read from it.
-            // Cloning twice would leave an unread branch that buffers the
-            // whole 75 MB body in memory.
-            const injected = injectShim(fresh, shimHtml);
-            const forPage = injected.clone();
+            // Clone right away: once the body starts streaming to the page it
+            // can no longer be cloned.
+            const copy = fresh.clone();
             event.waitUntil(
-              caches.open(CLIENT_CACHE).then((cache) => cache.put(request, injected))
+              caches.open(CLIENT_CACHE).then((cache) => cache.put(request, copy))
             );
-            return forPage;
+            return injectShim(fresh, shimHtml);
           }
           return fresh;
         } catch {
