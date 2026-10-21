@@ -1,34 +1,63 @@
-# eaglercraft-26.2
-minecraft 26.2 in the browser
-credits to o_xer
+# algebratools
 
-## Run locally (PWA install needs HTTP, not file://)
+A small launcher page that lists the web apps in `clients.json` and runs them
+as an installed PWA.
 
-Double-clicking `index.html` will not work for the PWA — browsers block
-service workers, `fetch()`, and the manifest on `file://` pages.
+## Run locally
+
+PWA install needs HTTP, not `file://` — browsers block service workers,
+`fetch()` and the manifest on `file://` pages.
 
 ```
 ./serve.sh        # or: ./serve.sh 8080 for a different port
 ```
 
-Then open http://localhost:8000 in Chrome — the install icon (⊕) appears in
-the address bar, and the custom "Install PWA" button works.
+Then open `http://localhost:8000` in Chrome.
 
-Deployed hosting must be HTTPS (GitHub Pages qualifies) for Chrome to offer
-install on a real URL.
+Deployed hosting must be HTTPS for Chrome to offer install on a real URL.
 
-## Live site
+## How it works
 
-<https://9hetwe903u5joigdhn43h.github.io/algebratools/>
+- `index.html` — the launcher UI, PWA install handling.
+- `clients.json` — the list of apps it can launch.
+- `sw.js` — service worker: precaches the launcher shell, caches app pages on
+  demand so they launch offline, and injects the shim below.
+- `client-shim.js` — injected into every app page as it is served.
+- `manifest.json`, `icons/` — PWA manifest and icons.
 
-Served by GitHub Pages from the `main` branch (legacy build, site root).
-Everything is referenced with relative paths, so the app also works from a
-project subpath.
+### The shim
 
-Notes:
-- The service worker precaches the launcher shell, so the launcher opens
-  offline. Client pages are cached the first time you open one (~75 MB each),
-  so a client you have played once also launches offline.
-- Each client load is a large download, so Pages bandwidth adds up — the
-  browser caches the file after the first fetch.
+`client-shim.js` is injected by the service worker while it serves an app
+page, so the app files themselves stay untouched and every entry gets the fix
+automatically. It runs before the app's own scripts and does two things:
 
+1. **Blocks the keyboard lock.** Some builds call `navigator.keyboard.lock()`
+   to grab the keyboard exclusively. While that lock is held the browser stops
+   handling system shortcuts for the page — Ctrl+Shift+Q, Ctrl+W, Ctrl+Tab,
+   and on ChromeOS even brightness, volume and power — which makes the
+   machine feel frozen. The shim lets the call succeed but never actually
+   locks, so app keys keep working and the system stays responsive.
+   `navigator.keyboard.getLayoutMap()` is left alone, so non-QWERTY layouts
+   still map key positions correctly.
+
+2. **Turns element fullscreen into window fullscreen.** A build that puts its
+   own wrapper div into element fullscreen does not resize the layout
+   viewport: the canvas keeps its old pixel size and renders stretched, and
+   the window's own fullscreen (F11, the keyboard's fullscreen key) stops
+   working. The shim redirects the request to the document element, so the
+   viewport really resizes, the app re-lays out, and F11 / Escape toggle
+   fullscreen cleanly.
+
+The shim also maps the hardware Back key to the launcher and makes F5 reload
+the app.
+
+Bump `CLIENT_CACHE` in `sw.js` when `client-shim.js` changes, so browsers
+pick up the new shim instead of serving the cached copy.
+
+## Offline
+
+The launcher shell is precached, so it opens without a network. App pages are
+cached the first time you open one, so anything you have already run also
+launches offline.
+
+credits to o_xer
