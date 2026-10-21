@@ -31,6 +31,7 @@ END = "<!--/launcher-shim-->"
 HEAD_RE = re.compile(r"<head\b[^>]*>", re.IGNORECASE)
 
 GROUP_FILE = "_group.json"
+DEFAULT_FILE = "_default.json"
 DEFAULT_ICON = "icons/icon-192.png"
 DEFAULT_VERSION = "—"
 
@@ -211,6 +212,28 @@ def group_order(group_dir: pathlib.Path) -> int:
     return order if isinstance(order, (int, float)) else 0
 
 
+def read_default(root=None) -> str:
+    """The client id that opens selected by default ("" when there is none)."""
+    root = pathlib.Path(root) if root else CLIENTS_DIR
+    data = load_json(root / DEFAULT_FILE)
+    if isinstance(data, dict):
+        value = data.get("defaultClient") or data.get("client")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def write_default(client_id: str, root=None) -> pathlib.Path:
+    """Record the default client. An empty id clears it."""
+    root = pathlib.Path(root) if root else CLIENTS_DIR
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / DEFAULT_FILE
+    payload = {"defaultClient": client_id.strip()}
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+    return path
+
+
 # ---------------------------------------------------------------------------
 # Catalog
 # ---------------------------------------------------------------------------
@@ -318,6 +341,7 @@ def build_catalog(root=None):
         "generated": "",
         "groups": group_list,
         "clients": clients,
+        "defaultClient": read_default(root),
     }
     return catalog, problems
 

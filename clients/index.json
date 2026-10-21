@@ -1,31 +1,24 @@
 {
-  "generated": "2026-10-21T22:57:50Z",
+  "generated": "2026-10-21T23:08:34Z",
   "groups": [
+    {
+      "path": "recomended",
+      "label": "Recomended",
+      "icon": "icons/icon-192.png",
+      "order": 0,
+      "count": 1,
+      "total": 1
+    },
     {
       "path": "eagler",
       "label": "Eaglercraft",
       "icon": "icons/icon-192.png",
       "order": 1,
-      "count": 3,
-      "total": 3
+      "count": 2,
+      "total": 2
     }
   ],
   "clients": [
-    {
-      "id": "eagler/26.2-dev-0.6",
-      "url": "clients/eagler/26.2-dev-0.6.html",
-      "name": "Eaglercraft 26.2 Dev 0.6",
-      "version": "26.2 Dev 0.6",
-      "author": "o_xer",
-      "description": "Minecraft 26.2 in the browser",
-      "icon": "icons/icon-192.png",
-      "group": "eagler",
-      "groupPath": [
-        "eagler"
-      ],
-      "groupLabel": "Eaglercraft",
-      "size": 75602976
-    },
     {
       "id": "eagler/26.2-dev-0.6-wisp",
       "url": "clients/eagler/26.2-dev-0.6-wisp.html",
@@ -55,6 +48,22 @@
       ],
       "groupLabel": "Eaglercraft",
       "size": 77596035
+    },
+    {
+      "id": "recomended/26.2-dev-0.6",
+      "url": "clients/recomended/26.2-dev-0.6.html",
+      "name": "Eaglercraft 26.2 Dev 0.6",
+      "version": "26.2 Dev 0.6",
+      "author": "o_xer",
+      "description": "Minecraft 26.2 in the browser",
+      "icon": "icons/icon-192.png",
+      "group": "recomended",
+      "groupPath": [
+        "recomended"
+      ],
+      "groupLabel": "Recomended",
+      "size": 75602976
     }
-  ]
+  ],
+  "defaultClient": "recomended/26.2-dev-0.6"
 }

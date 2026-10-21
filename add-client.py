@@ -44,6 +44,8 @@ def main() -> int:
     parser.add_argument("--move", action="store_true", help="move instead of copy")
     parser.add_argument("--force", action="store_true", help="overwrite an existing entry")
     parser.add_argument("--no-build", action="store_true", help="do not rebuild the catalog")
+    parser.add_argument("--default", action="store_true",
+                        help="also make this the default client")
     args = parser.parse_args()
 
     source = pathlib.Path(args.build).expanduser().resolve()
@@ -98,7 +100,15 @@ def main() -> int:
             indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(f"group: {group_meta.relative_to(clientlib.HERE)} (created)")
 
-    # 4. Rebuild the catalog.
+    # 4. Make it the default, if asked.
+    if args.default:
+        # The client id is its path in the catalog: the folder plus the file
+        # name without its extension.
+        client_id = group + "/" + pathlib.Path(slug).stem
+        path = clientlib.write_default(client_id)
+        print(f"default: {client_id} ({path.relative_to(clientlib.HERE)})")
+
+    # 5. Rebuild the catalog.
     if not args.no_build:
         print()
         catalog, path, updated, skipped, problems = clientlib.rebuild_catalog()

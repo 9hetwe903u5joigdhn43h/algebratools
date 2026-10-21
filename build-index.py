@@ -26,10 +26,18 @@ def main() -> int:
                         help="only report whether the index is up to date")
     parser.add_argument("--no-inject", action="store_true",
                         help="do not write the shim into the builds")
+    parser.add_argument("--default", metavar="ID",
+                        help="make this client the default one "
+                             "(use 'none' to clear it)")
     args = parser.parse_args()
 
     if not clientlib.CLIENTS_DIR.is_dir():
         raise SystemExit(f"missing {clientlib.CLIENTS_DIR}")
+
+    if args.default is not None:
+        wanted = "" if args.default.strip().lower() in ("none", "-") else args.default.strip()
+        path = clientlib.write_default(wanted)
+        print(f"default: {wanted or '(none)'} -> {path.relative_to(clientlib.HERE)}")
 
     # 1. The shim goes into the builds first, so the sizes the catalog
     #    reports are the sizes that are actually served.

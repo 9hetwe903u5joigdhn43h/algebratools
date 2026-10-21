@@ -64,6 +64,21 @@ The sidecar next to a build sets what the card shows:
 Anything left out is filled in from the file name, so a build without a
 sidecar still shows up — it just gets a generic name.
 
+### The default client
+
+```
+./build-index.py --default recomended/26.2-dev-0.6   # set it
+./build-index.py --default none                       # clear it
+```
+
+That writes `clients/_default.json` and the id goes into the catalog as
+`defaultClient`. It opens selected when the launcher loads.
+
+The launcher also remembers a default per browser (`localStorage`), and that
+one wins over the catalog's — so a client you pick with **Set default** in
+the details modal stays your default. The catalog default is what a fresh
+browser gets.
+
 ### Adding a client
 
 ```
@@ -83,7 +98,7 @@ minute if it is already open).
 
 Options: `--slug` for the file name, `--icon` for the card icon, `--move`
 to move the build instead of copying it, `--force` to overwrite an existing
-entry.
+entry, `--default` to make it the default client.
 
 ### The catalog scripts
 
@@ -92,6 +107,7 @@ entry.
 | `./build-index.py` | Injects the shim into every build and writes `clients/index.json` |
 | `./build-index.py --check` | Reports whether the catalog is out of date |
 | `./build-index.py --no-inject` | Writes the catalog without touching the builds |
+| `./build-index.py --default <id>` | Sets the client that opens selected |
 | `./inject-shim.py` | Injects the shim into every build under `clients/` |
 | `./inject-shim.py --check` | Reports which builds are out of date |
 | `./add-client.py` | Adds a build to the catalog in one step |
