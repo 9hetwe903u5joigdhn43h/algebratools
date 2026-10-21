@@ -151,6 +151,47 @@ function injectShim(response, shimHtml) {
   });
 }
 
+// Count the bytes of a client download and tell the launcher about it, so it
+// can show a progress bar while the client is fetched.
+function withProgress(response) {
+  let total = 0;
+  try {
+    const len = response.headers.get("content-length");
+    if (len) total = Number(len) || 0;
+  } catch (err) { /* ignore */ }
+
+  let loaded = 0;
+  let lastPost = 0;
+  const stream = response.body.pipeThrough(new TransformStream({
+    transform(chunk, controller) {
+      controller.enqueue(chunk);
+      loaded += chunk.byteLength || 0;
+      const now = Date.now();
+      if (now - lastPost > 150) {
+        lastPost = now;
+        self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({ type: "client-progress", loaded: loaded, total: total });
+          });
+        }).catch(() => {});
+      }
+    },
+    flush(controller) {
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: "client-progress", loaded: loaded, total: total });
+        });
+      }).catch(() => {});
+    }
+  }));
+
+  return new Response(stream, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  });
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
 
@@ -204,7 +245,7 @@ self.addEventListener("fetch", (event) => {
             event.waitUntil(
               caches.open(CLIENT_CACHE).then((cache) => cache.put(request, copy))
             );
-            return injectShim(fresh, shimHtml);
+            return injectShim(withProgress(fresh), shimHtml);
           }
           return fresh;
         } catch {

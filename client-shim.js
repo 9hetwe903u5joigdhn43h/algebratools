@@ -112,38 +112,6 @@
   // Leave a trace so the launcher can confirm the shim actually ran.
   saveStats();
 
-  // A brief on-screen note, so it is obvious the shim is active.
-  try {
-    function showShimNote() {
-      if (!document.body) return;
-      var note = document.createElement("div");
-      note.id = "__eaglercraft_shim_note";
-      note.textContent = "⌨ System keys unlocked";
-      note.style.cssText = [
-        "position:fixed",
-        "right:12px",
-        "bottom:12px",
-        "z-index:2147483647",
-        "font:600 12px/1.4 ui-monospace,Menlo,Consolas,monospace",
-        "color:#86efac",
-        "background:rgba(11,15,25,0.85)",
-        "border:1px solid rgba(34,197,94,0.35)",
-        "border-radius:10px",
-        "padding:6px 10px",
-        "pointer-events:none",
-        "transition:opacity .4s ease"
-      ].join(";");
-      document.body.appendChild(note);
-      setTimeout(function () { note.style.opacity = "0"; }, 2600);
-      setTimeout(function () { if (note.parentNode) note.parentNode.removeChild(note); }, 3200);
-    }
-    if (document.readyState === "loading") {
-      document.addEventListener("DOMContentLoaded", showShimNote, { once: true });
-    } else {
-      showShimNote();
-    }
-  } catch (err) { /* ignore */ }
-
   /* ------------------------------------------------------------------
      Controls panel — a small button in the bottom-left corner of the
      client opens it. It carries the controls that the game swallows

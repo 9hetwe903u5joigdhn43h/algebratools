@@ -147,6 +147,71 @@
       outline-offset: 2px;
     }
 
+    /* Loading overlay (client fetch) */
+    #launch-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 1400;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      text-align: center;
+      padding: 24px;
+    }
+
+    #launch-loading.visible { display: flex; }
+
+    .spinner {
+      width: 46px;
+      height: 46px;
+      border: 4px solid rgba(255, 255, 255, 0.12);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    #launch-loading-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .progress {
+      width: min(100%, 320px);
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: var(--accent);
+      transition: width 0.2s ease;
+    }
+
+    /* No content-length: slide a bar instead of showing a percentage. */
+    .progress.indeterminate > span {
+      width: 35%;
+      transition: none;
+      animation: slide 1.1s ease-in-out infinite;
+    }
+
+    @keyframes slide {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(285%); }
+    }
+
+    #launch-loading .hint {
+      margin-top: 0;
+      max-width: 320px;
+    }
+
     /* Settings panel */
     #settings-panel {
       position: fixed;
@@ -682,6 +747,14 @@
     <button class="close" id="banner-close">&times;</button>
   </div>
 
+  <!-- Loading overlay shown while the client is being fetched -->
+  <div id="launch-loading">
+    <div class="spinner"></div>
+    <div id="launch-loading-title">Starting…</div>
+    <div class="progress" id="launch-progress"><span id="launch-progress-bar"></span></div>
+    <div class="hint" id="launch-loading-status">Downloading the client…</div>
+  </div>
+
   <!-- Settings -->
   <div id="settings-panel" aria-hidden="true">
     <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
@@ -1011,6 +1084,36 @@
     /* --------------------------------------------------------------
        Launch
        -------------------------------------------------------------- */
+    const launchLoading = document.getElementById("launch-loading");
+    const launchLoadingTitle = document.getElementById("launch-loading-title");
+    const launchLoadingStatus = document.getElementById("launch-loading-status");
+    const launchProgress = document.getElementById("launch-progress");
+    const launchProgressBar = document.getElementById("launch-progress-bar");
+
+    function showLaunchLoading(name) {
+      launchLoadingTitle.textContent = "Starting " + name + "…";
+      launchLoadingStatus.textContent = "Downloading the client…";
+      launchProgressBar.style.width = "0%";
+      launchProgress.classList.remove("indeterminate");
+      launchLoading.classList.add("visible");
+    }
+
+    // The service worker reports how much of the client has arrived.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", (e) => {
+        const msg = e.data || {};
+        if (msg.type !== "client-progress") return;
+        if (typeof msg.total === "number" && msg.total > 0) {
+          const pct = Math.min(100, Math.round((msg.loaded / msg.total) * 100));
+          launchProgress.classList.remove("indeterminate");
+          launchProgressBar.style.width = pct + "%";
+          launchLoadingStatus.textContent = "Downloading the client… " + pct + "%";
+        } else {
+          launchProgress.classList.add("indeterminate");
+        }
+      });
+    }
+
     launchBtn.addEventListener("click", async () => {
       if (!isStandalone()) {
         // PWA enforcement: refuse to launch unless installed as a web app
@@ -1021,6 +1124,9 @@
       if (!c) return;
       launchBtn.disabled = true;
       launchBtn.textContent = "Loading…";
+      // Show the loading animation right away — the client page replaces the
+      // launcher as soon as the response headers arrive.
+      showLaunchLoading(c.name);
       // The service worker injects the client shim (unblocks the system keys).
       // Make sure it is actually in control before navigating, otherwise the
       // client page would be served without it.
