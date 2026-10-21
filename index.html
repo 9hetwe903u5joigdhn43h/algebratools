@@ -390,16 +390,6 @@
       background: #eab308;
     }
 
-    .client-icon {
-      width: 44px;
-      height: 44px;
-      flex: 0 0 44px;
-      border-radius: 10px;
-      background: #000;
-      border: 1px solid var(--card-border);
-      object-fit: contain;
-    }
-
     .client-main {      flex: 1;
       min-width: 0;
       overflow: hidden;
@@ -810,41 +800,6 @@
     }
 
     .group-header:first-child { margin-top: 0; }
-
-    /* Icon with a generated monogram behind it, so a client without an
-       icon still looks like something. */
-    .client-icon-wrap {
-      position: relative;
-      width: 44px;
-      height: 44px;
-      flex: 0 0 44px;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #000;
-      border: 1px solid var(--card-border);
-    }
-
-    .monogram {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #f3f4f6;
-      font: 800 15px/1 ui-monospace, Menlo, Consolas, monospace;
-      letter-spacing: 0.02em;
-    }
-
-    .client-icon-wrap .client-icon {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      border: none;
-      border-radius: 0;
-      object-fit: contain;
-      background: #000;
-    }
 
     .details-btn {
       width: 30px;
@@ -1589,43 +1544,6 @@
     /* --------------------------------------------------------------
        The client list
        -------------------------------------------------------------- */
-    function monogramFor(name) {
-      const words = String(name || "?").split(/\s+/).filter(Boolean);
-      if (!words.length) return "?";
-      if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-      return (words[0][0] + words[1][0]).toUpperCase();
-    }
-
-    function hueFor(id) {
-      let hash = 0;
-      const text = String(id || "");
-      for (let i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) | 0;
-      return Math.abs(hash) % 360;
-    }
-
-    function iconElement(client) {
-      const wrap = document.createElement("div");
-      wrap.className = "client-icon-wrap";
-
-      const mono = document.createElement("div");
-      mono.className = "monogram";
-      mono.textContent = monogramFor(client.name);
-      mono.style.background = "hsl(" + hueFor(client.id) + ", 42%, 34%)";
-      wrap.appendChild(mono);
-
-      if (client.icon) {
-        const img = document.createElement("img");
-        img.className = "client-icon";
-        img.src = client.icon;
-        img.alt = "";
-        img.loading = "lazy";
-        img.addEventListener("load", () => wrap.classList.add("has-icon"));
-        img.addEventListener("error", () => img.remove());
-        wrap.appendChild(img);
-      }
-      return wrap;
-    }
-
     function formatBytes(bytes) {
       if (!bytes) return "";
       const units = ["B", "KB", "MB", "GB"];
@@ -1660,8 +1578,7 @@
       if (c.id === selectedClientId) card.classList.add("selected");
       if (isFavorite) card.classList.add("favorite");
 
-      card.appendChild(iconElement(c));
-
+      // No icon on the card: every client would show the same picture.
       const main = document.createElement("div");
       main.className = "client-main";
 
