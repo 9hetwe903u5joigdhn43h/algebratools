@@ -49,7 +49,10 @@
       width: 100%;
       max-width: 900px;
       height: 100%;
-      max-height: 900px;
+      /* Grow with the window: on a tall screen the client list gets the
+         extra room instead of the launcher stopping at 900px. The body's
+         padding is the safe margin around it. */
+      max-height: 100%;
       min-width: 0;
       min-height: 0;
       display: flex;
@@ -118,6 +121,13 @@
 
     .section-head-text {
       min-width: 0;
+    }
+
+    .section-head-buttons {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .icon-btn {
@@ -849,6 +859,56 @@
       background: rgba(255, 255, 255, 0.05);
     }
 
+    /* The downloads panel: the clients kept on disk for offline play. */
+    #downloads-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(2, 6, 12, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #downloads-panel.visible { display: flex; }
+
+    /* The download button on a client card. */
+    .download-btn {
+      width: 30px;
+      height: 30px;
+      font-size: 0.95rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .download-btn:hover {
+      color: var(--text);
+      border-color: #374151;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .download-btn.downloaded {
+      color: #7dd3fc;
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .download-btn.downloaded:hover {
+      color: #fca5a5;
+      border-color: rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.08);
+    }
+
+    .download-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* The downloads button only shows up when something is on disk. */
+    .icon-btn.hidden { display: none; }
+
     .badge.offline {
       background: rgba(56, 189, 248, 0.14);
       border-color: rgba(56, 189, 248, 0.35);
@@ -896,15 +956,6 @@
       font-size: 1.05rem;
       overflow-wrap: anywhere;
     }
-
-    .modal-icon {
-      position: relative;
-      width: 52px;
-      height: 52px;
-      flex: 0 0 52px;
-    }
-
-    .modal-icon .client-icon-wrap { width: 52px; height: 52px; flex: 0 0 52px; }
 
     .modal-facts {
       display: grid;
@@ -1052,7 +1103,15 @@
             <h2 class="section-title">Clients</h2>
             <p class="section-sub">Search, pick a folder, or star a client to pin it to the top. The default client opens selected when the launcher loads.</p>
           </div>
-          <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+          <div class="section-head-buttons">
+            <button class="icon-btn hidden" id="downloads-btn" aria-label="Downloads" title="Downloads">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 4v11"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/>
+              </svg>
+            </button>
+            <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">&#9881;</button>
+          </div>
         </div>
       </div>
       <div class="browser">
@@ -1072,7 +1131,7 @@
       <strong>PWA enforcement:</strong> This launcher must run as an installed PWA. Install it to continue.
     </div>
 
-    <p class="hint">Works offline once installed. Download a client from its ⋯ menu to keep it offline.</p>
+    <p class="hint">Works offline once installed. Download a client to keep it offline.</p>
   </div>
 
   <!-- Blocking install-required overlay (shown until the PWA is installed) -->
@@ -1124,13 +1183,20 @@
       </label>
       <p class="settings-note">Type a combination such as <code>Alt+]</code>. The
       client picks these up the next time it starts.</p>
-      <div class="settings-group">Offline storage</div>
-      <div class="setting-row">
-        <span>Downloaded clients</span>
-        <span id="offline-summary" class="settings-note">none</span>
+    </div>
+  </div>
+
+  <!-- Downloads: the clients kept on disk for offline play -->
+  <div id="downloads-panel" aria-hidden="true">
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="downloads-title">
+      <div class="settings-head">
+        <h2 id="downloads-title">Downloads</h2>
+        <button class="icon-btn" id="downloads-close" aria-label="Close" title="Close">&#10005;</button>
       </div>
-      <div id="offline-list" class="offline-list"></div>
-      <button class="btn secondary" id="offline-clear">Remove all offline copies</button>
+      <p class="settings-note">Clients kept on disk for offline play. Each build is
+      around 75 MB, so it is worth removing the ones you do not play.</p>
+      <div id="downloads-list" class="offline-list"></div>
+      <button class="btn secondary" id="downloads-clear">Remove all downloads</button>
     </div>
   </div>
 
@@ -1138,7 +1204,6 @@
   <div id="client-modal" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-head">
-        <div id="modal-icon" class="modal-icon"></div>
         <div class="modal-head-text">
           <h2 id="modal-title">Client</h2>
           <div id="modal-meta" class="client-meta"></div>
@@ -1212,7 +1277,6 @@
     const clientSearch = document.getElementById("client-search");
     const launchBtn = document.getElementById("launch-btn");
     const clientModal = document.getElementById("client-modal");
-    const modalIcon = document.getElementById("modal-icon");
     const modalTitle = document.getElementById("modal-title");
     const modalMeta = document.getElementById("modal-meta");
     const modalDesc = document.getElementById("modal-desc");
@@ -1223,8 +1287,11 @@
     const modalDefault = document.getElementById("modal-default");
     const modalProgress = document.getElementById("modal-progress");
     const modalProgressBar = document.getElementById("modal-progress-bar");
-    const offlineSummary = document.getElementById("offline-summary");
-    const offlineList = document.getElementById("offline-list");
+    const downloadsBtn = document.getElementById("downloads-btn");
+    const downloadsPanel = document.getElementById("downloads-panel");
+    const downloadsList = document.getElementById("downloads-list");
+    const downloadsClose = document.getElementById("downloads-close");
+    const downloadsClear = document.getElementById("downloads-clear");
     const banner = document.getElementById("install-banner");
     const bannerInstall = document.getElementById("banner-install");
     const bannerClose = document.getElementById("banner-close");
@@ -1568,6 +1635,17 @@
       return (value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)) + " " + units[unit];
     }
 
+    // Inline SVG instead of a character: the arrow glyphs fall back to an
+    // emoji in a lot of fonts and end up as a little box.
+    const ICON_DOWNLOAD =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M12 4v11"/><path d="M7.5 11.5 12 16l4.5-4.5"/><path d="M5 20h14"/></svg>';
+    const ICON_DONE =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="m5 12.5 4.5 4.5L19 7"/></svg>';
+
     function createClientCard(c) {
       const isDefault = c.id === defaultClientId;
       const isFavorite = favorites.has(c.id);
@@ -1630,15 +1708,20 @@
       favoriteBtn.setAttribute("aria-label", favoriteBtn.title);
       favoriteBtn.setAttribute("aria-pressed", String(isFavorite));
 
-      const detailsBtn = document.createElement("button");
-      detailsBtn.type = "button";
-      detailsBtn.className = "client-action details-btn";
-      detailsBtn.dataset.action = "details";
-      detailsBtn.textContent = "⋯";
-      detailsBtn.title = "Client details";
-      detailsBtn.setAttribute("aria-label", "Details for " + c.name);
+      const downloadBtn = document.createElement("button");
+      downloadBtn.type = "button";
+      downloadBtn.className = "client-action download-btn" + (isOffline ? " downloaded" : "");
+      downloadBtn.dataset.action = "download";
+      downloadBtn.innerHTML = isOffline ? ICON_DONE : ICON_DOWNLOAD;
+      downloadBtn.title = isOffline ? "Remove the offline copy" : "Download for offline";
+      downloadBtn.setAttribute("aria-label", downloadBtn.title);
+      if (downloads.has(c.url)) {
+        downloadBtn.textContent = "…";
+        downloadBtn.disabled = true;
+        downloadBtn.title = "Downloading…";
+      }
 
-      actions.append(favoriteBtn, detailsBtn);
+      actions.append(favoriteBtn, downloadBtn);
       card.append(main, actions);
       return card;
     }
@@ -1732,16 +1815,19 @@
       const card = event.target.closest(".client-card");
       if (!card) return;
       const id = card.dataset.id;
+      const client = clients.find((c) => c.id === id);
       const action = event.target.closest(".client-action");
       if (action) {
         if (action.dataset.action === "favorite") toggleFavorite(id);
-        if (action.dataset.action === "details") {
-          const client = clients.find((c) => c.id === id);
-          if (client) openModal(client);
+        if (action.dataset.action === "download" && client) {
+          if (offlineClients.has(client.url)) removeOffline(client);
+          else downloadClient(client);
         }
         return;
       }
+      // Clicking the card selects it and opens its details.
       selectClient(id);
+      if (client) openModal(client);
     });
 
     clientList.addEventListener("keydown", (event) => {
@@ -1751,6 +1837,8 @@
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         selectClient(card.dataset.id);
+        const client = clients.find((c) => c.id === card.dataset.id);
+        if (client) openModal(client);
         return;
       }
 
@@ -1802,8 +1890,6 @@
     }
 
     function fillModal(client) {
-      modalIcon.innerHTML = "";
-      modalIcon.appendChild(iconElement(client));
       modalTitle.textContent = client.name;
       modalMeta.textContent = [client.version, client.author].filter(Boolean).join(" · ");
       modalDesc.textContent = client.description || "";
@@ -1878,39 +1964,72 @@
       offlineClients = new Map((msg.clients || []).map((c) => [c.path, c.size || 0]));
       renderClients();
       if (modalClient) fillModal(modalClient);
-      updateOfflineSummary();
+      renderDownloads();
     }
 
-    function updateOfflineSummary() {
+    // The downloads button only shows up when there is something on disk.
+    function updateDownloadsButton() {
+      downloadsBtn.classList.toggle("hidden", offlineClients.size === 0);
+    }
+
+    function renderDownloads() {
+      updateDownloadsButton();
+
       let bytes = 0;
       for (const size of offlineClients.values()) bytes += size;
-      offlineSummary.textContent = offlineClients.size
-        ? offlineClients.size + (offlineClients.size === 1 ? " client" : " clients") +
-          " · " + formatBytes(bytes)
-        : "none";
 
-      offlineList.innerHTML = "";
+      downloadsList.innerHTML = "";
       for (const [path, size] of offlineClients) {
         const client = clients.find((c) => c.url === path);
         const row = document.createElement("div");
         row.className = "offline-row";
+
         const name = document.createElement("span");
         name.className = "offline-name";
         name.textContent = client ? client.name : path;
+
         const sizeEl = document.createElement("span");
         sizeEl.className = "offline-size";
         sizeEl.textContent = formatBytes(size);
+
         const remove = document.createElement("button");
         remove.type = "button";
         remove.className = "offline-remove";
         remove.textContent = "Remove";
+        remove.setAttribute("aria-label", "Remove " + (client ? client.name : path));
         remove.addEventListener("click", () => {
           if (client) removeOffline(client);
           else postToWorker({ type: "uncache-client", url: path });
         });
+
         row.append(name, sizeEl, remove);
-        offlineList.appendChild(row);
+        downloadsList.appendChild(row);
       }
+
+      if (!offlineClients.size) {
+        const empty = document.createElement("p");
+        empty.className = "settings-note";
+        empty.textContent = "Nothing is downloaded. " + bytes + " on disk.";
+        downloadsList.appendChild(empty);
+      } else {
+        const total = document.createElement("p");
+        total.className = "settings-note";
+        total.textContent = offlineClients.size +
+          (offlineClients.size === 1 ? " client" : " clients") + " · " +
+          formatBytes(bytes) + " on disk.";
+        downloadsList.appendChild(total);
+      }
+    }
+
+    function openDownloads() {
+      renderDownloads();
+      downloadsPanel.classList.add("visible");
+      downloadsPanel.setAttribute("aria-hidden", "false");
+    }
+
+    function closeDownloads() {
+      downloadsPanel.classList.remove("visible");
+      downloadsPanel.setAttribute("aria-hidden", "true");
     }
 
     modalDownload.addEventListener("click", () => {
@@ -1944,9 +2063,19 @@
       }
     });
 
-    document.getElementById("offline-clear").addEventListener("click", () => {
+    downloadsBtn.addEventListener("click", openDownloads);
+    downloadsClose.addEventListener("click", closeDownloads);
+    downloadsClear.addEventListener("click", () => {
       for (const path of offlineClients.keys()) {
         postToWorker({ type: "uncache-client", url: path });
+      }
+    });
+    downloadsPanel.addEventListener("click", (event) => {
+      if (event.target === downloadsPanel) closeDownloads();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && downloadsPanel.classList.contains("visible")) {
+        closeDownloads();
       }
     });
 
@@ -2626,7 +2755,7 @@
     loadClients();
     registerSW();
     enforcePWA();
-    updateOfflineSummary();
+    renderDownloads();
     refreshOfflineStatus();
 
     // A client can be added while the launcher is open. The service worker

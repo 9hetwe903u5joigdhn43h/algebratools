@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T23:21:55Z",
+  "generated": "2026-10-21T23:38:39Z",
   "groups": [
     {
       "path": "recomended",
@@ -19,7 +19,7 @@
     },
     {
       "path": "wisp",
-      "label": "Eaglercraft",
+      "label": "Wisp",
       "icon": "icons/icon-192.png",
       "order": 2,
       "count": 2,
@@ -84,7 +84,7 @@
       "groupPath": [
         "wisp"
       ],
-      "groupLabel": "Eaglercraft",
+      "groupLabel": "Wisp",
       "size": 77418467
     },
     {
@@ -99,7 +99,7 @@
       "groupPath": [
         "wisp"
       ],
-      "groupLabel": "Eaglercraft",
+      "groupLabel": "Wisp",
       "size": 77596035
     }
   ],

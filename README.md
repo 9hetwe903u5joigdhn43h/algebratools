@@ -19,7 +19,7 @@ Deployed hosting must be HTTPS for Chrome to offer install on a real URL.
 ## How it works
 
 - `index.html` — the launcher UI: the folder tree, the client list, the
-  details modal, PWA install handling.
+  details modal, the downloads panel, PWA install handling.
 - `clients/` — the client builds, in folders. `clients/index.json` is the
   generated catalog the launcher reads.
 - `sw.js` — service worker: precaches the launcher shell, serves the
@@ -201,11 +201,11 @@ catalog is refreshed in the background whenever it is fetched, so a newly
 added client shows up without bumping a cache name.
 
 The client builds are **not** cached automatically any more — they are ~75 MB
-each, and caching every client you ever open fills the disk. Open a client's
-`⋯` menu and use **Download for offline** to keep a copy. The settings panel
-shows what is on disk and lets you remove it. The oldest copy is dropped
-automatically when the offline budget (`OFFLINE_BUDGET` in `sw.js`, 2 GB) is
-exceeded.
+each, and caching every client you ever open fills the disk. Use the
+download button on a client card to keep a copy, and the **Downloads** button
+next to the settings gear to see what is on disk and remove it. The oldest
+copy is dropped automatically when the offline budget (`OFFLINE_BUDGET` in
+`sw.js`, 2 GB) is exceeded.
 
 ## How many clients fit?
 
