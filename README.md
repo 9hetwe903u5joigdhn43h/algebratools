@@ -51,6 +51,22 @@ automatically. It runs before the app's own scripts and does two things:
 The shim also maps the hardware Back key to the launcher and makes F5 reload
 the app.
 
+### Keybinds
+
+The client has keybinds for the panel actions. They are stored in
+`localStorage` under `eaglercraft.launcher.keybinds`, which the launcher and
+the client share, and the launcher's settings panel (gear button) has a field
+for each one:
+
+| Action | Default |
+|---|---|
+| Fullscreen on | `Alt+]` |
+| Fullscreen off | `Alt+[` |
+| Back to the launcher | `Alt+\` |
+| Toggle the debug readout | `Alt+`` |
+
+Combinations are normalised, so `ctrl+shift+l` is stored as `Ctrl+Shift+L`.
+
 Bump `CLIENT_CACHE` in `sw.js` when `client-shim.js` changes, so browsers
 pick up the new shim instead of serving the cached copy.
 
