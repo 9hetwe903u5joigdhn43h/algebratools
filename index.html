@@ -278,6 +278,40 @@
       font-size: 0.85rem;
     }
 
+    .keybind-input {
+      width: 110px;
+      background: #0b1120;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font: 0.85rem ui-monospace, Menlo, Consolas, monospace;
+      text-align: center;
+    }
+
+    .keybind-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .settings-group {
+      margin: 18px 0 4px;
+      padding-top: 14px;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .settings-note code {
+      background: rgba(255,255,255,0.08);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.95em;
+    }
+
     .setting-row input[type="checkbox"] {
       width: 18px;
       height: 18px;
@@ -762,7 +796,8 @@
         <h2 id="settings-title">Settings</h2>
         <button class="icon-btn" id="settings-close" aria-label="Close settings">&#10005;</button>
       </div>
-      <p class="settings-note">These settings are placeholders for now — nothing is saved yet.</p>
+      <p class="settings-note">The placeholder options are not wired up yet. The
+      keybinds below are saved and used by the client.</p>
       <label class="setting-row">
         <span>Placeholder: show client descriptions</span>
         <input type="checkbox" id="setting-show-descriptions" checked />
@@ -783,6 +818,25 @@
         <span>Placeholder: confirm before launching</span>
         <input type="checkbox" id="setting-confirm-launch" />
       </label>
+      <div class="settings-group">Keybinds (in the client)</div>
+      <label class="setting-row">
+        <span>Fullscreen on</span>
+        <input type="text" class="keybind-input" id="keybind-fullscreen-on" spellcheck="false" />
+      </label>
+      <label class="setting-row">
+        <span>Fullscreen off</span>
+        <input type="text" class="keybind-input" id="keybind-fullscreen-off" spellcheck="false" />
+      </label>
+      <label class="setting-row">
+        <span>Back to launcher</span>
+        <input type="text" class="keybind-input" id="keybind-launcher" spellcheck="false" />
+      </label>
+      <label class="setting-row">
+        <span>Debug panel</span>
+        <input type="text" class="keybind-input" id="keybind-debug" spellcheck="false" />
+      </label>
+      <p class="settings-note">Type a combination such as <code>Alt+]</code>. The
+      client picks these up the next time it starts.</p>
     </div>
   </div>
 
@@ -1424,6 +1478,96 @@
         closeSettings();
       }
     });
+
+    /* --------------------------------------------------------------
+       Keybinds (shared with the client through localStorage)
+       -------------------------------------------------------------- */
+    const STORAGE_KEYBINDS = "eaglercraft.launcher.keybinds";
+    const DEFAULT_KEYBINDS = {
+      fullscreenOn: "Alt+]",
+      fullscreenOff: "Alt+[",
+      launcher: "Alt+\\",
+      debug: "Alt+`"
+    };
+    const KEYBIND_FIELDS = {
+      "keybind-fullscreen-on": "fullscreenOn",
+      "keybind-fullscreen-off": "fullscreenOff",
+      "keybind-launcher": "launcher",
+      "keybind-debug": "debug"
+    };
+
+    function loadKeybinds() {
+      const binds = Object.assign({}, DEFAULT_KEYBINDS);
+      try {
+        const raw = localStorage.getItem(STORAGE_KEYBINDS);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object") {
+            Object.keys(binds).forEach((name) => {
+              if (typeof parsed[name] === "string" && parsed[name]) binds[name] = parsed[name];
+            });
+          }
+        }
+      } catch (err) { /* keep the defaults */ }
+      return binds;
+    }
+
+    function saveKeybinds(binds) {
+      try { localStorage.setItem(STORAGE_KEYBINDS, JSON.stringify(binds)); } catch (err) { /* ignore */ }
+    }
+
+    // "alt+]" -> "Alt+]" ; returns null when it cannot be understood.
+    function normaliseKeybind(text) {
+      const raw = String(text || "").trim();
+      if (!raw) return null;
+      const parts = raw.split("+");
+      let key = parts.pop();
+      if (!key) return null;
+      const mods = { ctrl: false, alt: false, shift: false, meta: false };
+      parts.forEach((part) => {
+        const p = part.trim().toLowerCase();
+        if (p === "ctrl" || p === "control") mods.ctrl = true;
+        else if (p === "alt" || p === "option") mods.alt = true;
+        else if (p === "shift") mods.shift = true;
+        else if (p === "meta" || p === "cmd" || p === "command" || p === "win") mods.meta = true;
+      });
+      if (key === " ") key = "Space";
+      else if (key.length === 1) key = key.toUpperCase();
+      const out = [];
+      if (mods.ctrl) out.push("Ctrl");
+      if (mods.alt) out.push("Alt");
+      if (mods.shift) out.push("Shift");
+      if (mods.meta) out.push("Meta");
+      out.push(key);
+      return out.join("+");
+    }
+
+    function applyKeybindFields() {
+      const binds = loadKeybinds();
+      Object.entries(KEYBIND_FIELDS).forEach(([id, name]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = binds[name];
+      });
+    }
+
+    Object.entries(KEYBIND_FIELDS).forEach(([id, name]) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.addEventListener("change", () => {
+        const normalised = normaliseKeybind(input.value);
+        if (!normalised) {
+          input.value = loadKeybinds()[name];
+          showToast("That is not a key combination I understand.");
+          return;
+        }
+        const binds = loadKeybinds();
+        binds[name] = normalised;
+        saveKeybinds(binds);
+        input.value = normalised;
+        showToast("Saved " + normalised + " — the client picks it up next time.");
+      });
+    });
+    applyKeybindFields();
 
     /* --------------------------------------------------------------
        PWA enforcement

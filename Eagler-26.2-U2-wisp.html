@@ -1,6 +1,6 @@
 <html style="width:100%;height:100%;background-color:black;"><head>
 <!--launcher-shim-->
-<!-- source: client-shim.js (sha256:1a3075d08f39) -->
+<!-- source: client-shim.js (sha256:85b1b45d7cb8) -->
 <script>
 /* Launcher shim for the Eaglercraft clients.
  *
@@ -49,6 +49,60 @@
   function saveStats() {
     try { localStorage.setItem("eaglercraft.shim", JSON.stringify(stats)); } catch (err) { /* ignore */ }
   }
+
+  /* ------------------------------------------------------------------
+     Keybinds — configurable from the launcher settings. They live in
+     localStorage, which the launcher and the client share.
+     ------------------------------------------------------------------ */
+  var KEYBIND_STORAGE = "eaglercraft.launcher.keybinds";
+
+  function defaultKeybinds() {
+    return {
+      fullscreenOn: "Alt+]",
+      fullscreenOff: "Alt+[",
+      launcher: "Alt+\\",
+      debug: "Alt+`"
+    };
+  }
+
+  function loadKeybinds() {
+    var binds = defaultKeybinds();
+    try {
+      var raw = localStorage.getItem(KEYBIND_STORAGE);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          Object.keys(binds).forEach(function (name) {
+            if (typeof parsed[name] === "string" && parsed[name]) binds[name] = parsed[name];
+          });
+        }
+      }
+    } catch (err) { /* use the defaults */ }
+    return binds;
+  }
+
+  // Canonical form of a key event: "Ctrl+Alt+Shift+Key".
+  function keySignature(event) {
+    var parts = [];
+    if (event.ctrlKey) parts.push("Ctrl");
+    if (event.altKey) parts.push("Alt");
+    if (event.shiftKey) parts.push("Shift");
+    if (event.metaKey) parts.push("Meta");
+    var key = event.key;
+    if (key === " ") key = "Space";
+    else if (key && key.length === 1) key = key.toUpperCase();
+    parts.push(key);
+    return parts.join("+");
+  }
+
+  var keybinds = loadKeybinds();
+
+  try {
+    // Settings changed in another tab: pick them up.
+    window.addEventListener("storage", function (e) {
+      if (e.key === KEYBIND_STORAGE) keybinds = loadKeybinds();
+    });
+  } catch (err) { /* ignore */ }
 
   /* ------------------------------------------------------------------
      1. Never actually lock the keyboard
@@ -301,6 +355,11 @@
       lines.push("fullscreen wanted: " + (wantFullscreen ? "yes" : "no"));
       lines.push("fullscreen requests: " + stats.fsRequests +
         " ok " + stats.fsOk + (stats.fsError ? " (" + stats.fsError + ")" : ""));
+      lines.push("keybinds:");
+      lines.push("  " + keybinds.fullscreenOn + "  fullscreen on");
+      lines.push("  " + keybinds.fullscreenOff + "  fullscreen off");
+      lines.push("  " + keybinds.launcher + "  back to launcher");
+      lines.push("  " + keybinds.debug + "  debug panel");
       lines.push("display-mode: " + displayMode());
       lines.push("worker controlling: " + (navigator.serviceWorker.controller ? "yes" : "no"));
       lines.push("audio master: " + (masterGain ? "yes" : "no"));
@@ -454,6 +513,49 @@
     document.addEventListener("mousedown", restoreFullscreen, true);
     document.addEventListener("touchstart", restoreFullscreen, true);
     document.addEventListener("keydown", restoreFullscreen, true);
+
+    // Configurable keybinds for the panel actions.
+    window.addEventListener("keydown", function (e) {
+      // Never fire while the player is typing (the game's chat box).
+      var el = e.target;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
+        return;
+      }
+      var sig = keySignature(e);
+      if (sig === keybinds.fullscreenOn) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isFullscreen()) {
+          wantFullscreen = true;
+          requestFullscreen();
+        }
+        return;
+      }
+      if (sig === keybinds.fullscreenOff) {
+        e.preventDefault();
+        e.stopPropagation();
+        wantFullscreen = false;
+        try {
+          var exit = document.exitFullscreen || document.webkitExitFullscreen;
+          if (exit) exit.call(document);
+        } catch (err) { /* ignore */ }
+        return;
+      }
+      if (sig === keybinds.launcher) {
+        e.preventDefault();
+        e.stopPropagation();
+        backToLauncher();
+        return;
+      }
+      if (sig === keybinds.debug) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (debugEl) {
+          debugEl.style.display = debugEl.style.display === "none" ? "block" : "none";
+          refreshPanel();
+        }
+      }
+    }, true);
 
     // Volume keys, when the browser forwards them to the page.
     window.addEventListener("keydown", function (e) {
