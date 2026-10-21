@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T23:08:34Z",
+  "generated": "2026-10-21T23:21:55Z",
   "groups": [
     {
       "path": "recomended",
@@ -10,44 +10,52 @@
       "total": 1
     },
     {
-      "path": "eagler",
-      "label": "Eaglercraft",
+      "path": "modded",
+      "label": "Modded",
       "icon": "icons/icon-192.png",
       "order": 1,
+      "count": 2,
+      "total": 2
+    },
+    {
+      "path": "wisp",
+      "label": "Eaglercraft",
+      "icon": "icons/icon-192.png",
+      "order": 2,
       "count": 2,
       "total": 2
     }
   ],
   "clients": [
     {
-      "id": "eagler/26.2-dev-0.6-wisp",
-      "url": "clients/eagler/26.2-dev-0.6-wisp.html",
-      "name": "Eaglercraft 26.2 Dev 0.6 Wispcraft",
-      "version": "26.2 Dev 0.6",
+      "id": "modded/eaglercraft-26.2-litematica",
+      "url": "clients/modded/eaglercraft-26.2-litematica.html",
+      "name": "Eaglercraft 26.2 Litematica",
+      "version": "26.2 u1",
       "author": "o_xer",
-      "description": "Dev 0.6 build with Wisp for lower ping",
+      "description": "Eaglercraft 26.2 with the Litematica mod",
       "icon": "icons/icon-192.png",
-      "group": "eagler",
+      "group": "modded",
       "groupPath": [
-        "eagler"
+        "modded"
       ],
-      "groupLabel": "Eaglercraft",
-      "size": 77418467
+      "groupLabel": "Modded",
+      "size": 94115208
     },
     {
-      "id": "eagler/26.2-u2-wisp",
-      "url": "clients/eagler/26.2-u2-wisp.html",
-      "name": "Eaglercraft 26.2 U2 Wispcraft",
-      "version": "26.2 U2",
-      "author": "o_xer",
-      "description": "Update 2 build with Wisp for lower ping",
+      "id": "modded/Voltan-26.2-U2.1",
+      "url": "clients/modded/Voltan-26.2-U2.1.html",
+      "name": "Voltan 26.2 U2.1",
+      "version": "U2.1",
+      "author": "Voltan",
+      "description": "Voltan build of Eaglercraft 26.2",
       "icon": "icons/icon-192.png",
-      "group": "eagler",
+      "group": "modded",
       "groupPath": [
-        "eagler"
+        "modded"
       ],
-      "groupLabel": "Eaglercraft",
-      "size": 77596035
+      "groupLabel": "Modded",
+      "size": 81294264
     },
     {
       "id": "recomended/26.2-dev-0.6",
@@ -63,6 +71,36 @@
       ],
       "groupLabel": "Recomended",
       "size": 75602976
+    },
+    {
+      "id": "wisp/26.2-dev-0.6-wisp",
+      "url": "clients/wisp/26.2-dev-0.6-wisp.html",
+      "name": "Eaglercraft 26.2 Dev 0.6 Wispcraft",
+      "version": "26.2 Dev 0.6",
+      "author": "o_xer",
+      "description": "Dev 0.6 build with Wisp for lower ping",
+      "icon": "icons/icon-192.png",
+      "group": "wisp",
+      "groupPath": [
+        "wisp"
+      ],
+      "groupLabel": "Eaglercraft",
+      "size": 77418467
+    },
+    {
+      "id": "wisp/26.2-u2-wisp",
+      "url": "clients/wisp/26.2-u2-wisp.html",
+      "name": "Eaglercraft 26.2 U2 Wispcraft",
+      "version": "26.2 U2",
+      "author": "o_xer",
+      "description": "Update 2 build with Wisp for lower ping",
+      "icon": "icons/icon-192.png",
+      "group": "wisp",
+      "groupPath": [
+        "wisp"
+      ],
+      "groupLabel": "Eaglercraft",
+      "size": 77596035
     }
   ],
   "defaultClient": "recomended/26.2-dev-0.6"

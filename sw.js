@@ -404,9 +404,14 @@ self.addEventListener("fetch", (event) => {
           // Launcher shell: network-first so launcher updates actually reach
           // the browser; fall back to cache when offline. Online responses
           // refresh the cached copy for the next offline session.
+          //
+          // "no-cache" matters: without it the browser's own HTTP cache can
+          // answer with the old shell, and a launcher that quietly keeps
+          // running yesterday's code is worse than one that is a second
+          // slower to load.
           const cached = await caches.match(request, { ignoreSearch: true });
           try {
-            const fresh = await fetch(request);
+            const fresh = await fetch(request, { cache: "no-cache" });
             // Clone right away: once the body starts streaming to the page it
             // can no longer be cloned.
             const copy = fresh.ok && fresh.type === "basic" ? fresh.clone() : null;

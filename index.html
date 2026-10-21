@@ -1500,9 +1500,23 @@
         }
         return "Ungrouped (" + count + ")";
       }
-      const meta = treeNodes.get(activeGroup ? activeGroup + "/" + key : key);
+      const meta = treeNodes.get(bucketPath(key));
       const label = meta ? meta.label : humanize(key);
       return label + " (" + count + ")";
+    }
+
+    // The full path of a bucket, so it can be looked up in the group list.
+    function bucketPath(key) {
+      if (activeGroup === "favorites") return key || "";
+      if (!key) return activeGroup || "";
+      return activeGroup ? activeGroup + "/" + key : key;
+    }
+
+    // The order a folder was given in its _group.json. The list follows the
+    // same order as the tree beside it.
+    function groupOrder(pathKey) {
+      const meta = groups.find((g) => g.path === pathKey);
+      return meta ? meta.order : 0;
     }
 
     /* --------------------------------------------------------------
@@ -1655,7 +1669,8 @@
         return;
       }
 
-      // Bucket them by the sub-folder they sit in.
+      // Bucket them by the sub-folder they sit in, in the order the folders
+      // were given — the same order the tree beside the list uses.
       const buckets = new Map();
       for (const c of list) {
         const key = groupKeyFor(c);
@@ -1663,7 +1678,12 @@
         buckets.get(key).push(c);
       }
 
-      for (const [key, items] of buckets) {
+      const ordered = [...buckets.entries()].sort((a, b) => {
+        const order = groupOrder(bucketPath(a[0])) - groupOrder(bucketPath(b[0]));
+        return order || a[0].localeCompare(b[0]);
+      });
+
+      for (const [key, items] of ordered) {
         items.sort((a, b) => {
           const fav = (favorites.has(b.id) ? 1 : 0) - (favorites.has(a.id) ? 1 : 0);
           return fav || a.name.localeCompare(b.name);
