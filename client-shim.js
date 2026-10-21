@@ -49,6 +49,57 @@
     warn("could not patch keyboard.lock:", err);
   }
 
+  // Safety net: if anything manages to lock the keyboard anyway, drop it.
+  try {
+    if (navigator.keyboard && typeof navigator.keyboard.unlock === "function") {
+      setInterval(function () {
+        try {
+          if (navigator.keyboard.locked) {
+            navigator.keyboard.unlock();
+            warn("keyboard lock released");
+          }
+        } catch (err) { /* ignore */ }
+      }, 1000);
+    }
+  } catch (err) { /* ignore */ }
+
+  // Leave a trace so the launcher can confirm the shim actually ran.
+  try {
+    localStorage.setItem("eaglercraft.shim", String(Date.now()));
+  } catch (err) { /* private mode */ }
+
+  // A brief on-screen note, so it is obvious the shim is active.
+  try {
+    function showShimNote() {
+      if (!document.body) return;
+      var note = document.createElement("div");
+      note.id = "__eaglercraft_shim_note";
+      note.textContent = "⌨ System keys unlocked";
+      note.style.cssText = [
+        "position:fixed",
+        "right:12px",
+        "bottom:12px",
+        "z-index:2147483647",
+        "font:600 12px/1.4 ui-monospace,Menlo,Consolas,monospace",
+        "color:#86efac",
+        "background:rgba(11,15,25,0.85)",
+        "border:1px solid rgba(34,197,94,0.35)",
+        "border-radius:10px",
+        "padding:6px 10px",
+        "pointer-events:none",
+        "transition:opacity .4s ease"
+      ].join(";");
+      document.body.appendChild(note);
+      setTimeout(function () { note.style.opacity = "0"; }, 2600);
+      setTimeout(function () { if (note.parentNode) note.parentNode.removeChild(note); }, 3200);
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", showShimNote, { once: true });
+    } else {
+      showShimNote();
+    }
+  } catch (err) { /* ignore */ }
+
   /* ------------------------------------------------------------------
      2. Element fullscreen -> window fullscreen
      ------------------------------------------------------------------ */

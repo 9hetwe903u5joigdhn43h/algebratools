@@ -1009,7 +1009,7 @@
     /* --------------------------------------------------------------
        Launch
        -------------------------------------------------------------- */
-    launchBtn.addEventListener("click", () => {
+    launchBtn.addEventListener("click", async () => {
       if (!isStandalone()) {
         // PWA enforcement: refuse to launch unless installed as a web app
         showInstallRequired();
@@ -1019,6 +1019,12 @@
       if (!c) return;
       launchBtn.disabled = true;
       launchBtn.textContent = "Loading…";
+      // The service worker injects the client shim (unblocks the system keys).
+      // Make sure it is actually in control before navigating, otherwise the
+      // client page would be served without it.
+      if (!await ensureServiceWorker()) {
+        showToast("The service worker is not active — system keys may not work in the client.", 8000);
+      }
       // Exactly one window, end to end: the client replaces the launcher page
       // in this same window. No popups, no new tabs. The service worker serves
       // both the shell and the client from cache, so navigating back returns
@@ -1027,6 +1033,27 @@
       launchBtn.disabled = false;
       launchBtn.textContent = "Launch Client";
     });
+
+    // Returns true when a service worker is controlling this page.
+    async function ensureServiceWorker() {
+      if (!("serviceWorker" in navigator)) return false;
+      try {
+        if (!navigator.serviceWorker.controller) {
+          await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+          await navigator.serviceWorker.ready;
+          if (!navigator.serviceWorker.controller) {
+            await new Promise((resolve) => {
+              navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+              setTimeout(resolve, 3000);
+            });
+          }
+        }
+        return !!navigator.serviceWorker.controller;
+      } catch (err) {
+        console.warn("[PWA] could not activate the service worker:", err);
+        return false;
+      }
+    }
 
     /* --------------------------------------------------------------
        PWA install handling
@@ -1430,6 +1457,15 @@
         lines.push("deferredInstallPrompt: " + (deferredInstallPrompt ? "yes" : "no"));
         const guide = detectInstallGuide();
         lines.push("install guide: " + guide.label + " -> " + guide.url);
+        let shim = "never ran";
+        try {
+          const seen = localStorage.getItem("eaglercraft.shim");
+          if (seen) {
+            const when = new Date(Number(seen));
+            shim = "active (last run: " + (isNaN(when.getTime()) ? seen : when.toLocaleTimeString()) + ")";
+          }
+        } catch (err) { /* ignore */ }
+        lines.push("client shim: " + shim);
         lines.push("controller: " + (navigator.serviceWorker.controller ? "yes" : "no"));
         lines.push("manifest: checking…");
         fetch("manifest.json").then(r => r.json()).then(m => {
