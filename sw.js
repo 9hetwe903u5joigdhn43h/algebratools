@@ -10,7 +10,7 @@
 
 // Bump this whenever the launcher shell changes. Bumping purges every old
 // launcher cache during activation, so no stale shell can survive.
-const CACHE_NAME = "eaglercraft-launcher-v5";
+const CACHE_NAME = "eaglercraft-launcher-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -74,10 +74,14 @@ const SHIM_PATH = "./client-shim.js";
 let shimPromise = null;
 let shimSource = null;
 
-// Wrap the shim source in a script tag so the browser executes it.
+// Wrap the shim source in a script tag so the browser executes it. The
+// charset declaration goes first: the client builds declare theirs megabytes
+// into the document, far outside the window the browser sniffs.
 function wrapShim(source) {
   if (!source) return "";
-  return "<script>\n" + source.replace(/<\/script/gi, "<\\/script") + "\n</script>\n";
+  return "<meta charset=\"utf-8\" />\n<script>\n" +
+    source.replace(/<\/script/gi, "<\\/script") +
+    "\n</script>\n";
 }
 
 // Network first, so an updated shim is picked up without re-downloading the
@@ -113,6 +117,15 @@ function injectShim(response, shimHtml) {
   const headers = new Headers(response.headers);
   headers.delete("content-encoding");
   headers.delete("content-length");
+
+  // The client builds put their <meta charset> far outside the 1024 byte
+  // window the browser sniffs, so the encoding has to come from the header —
+  // otherwise anything non-ASCII (the panel glyph, for one) is decoded as
+  // windows-1252 and comes out as mojibake.
+  const type = headers.get("content-type") || "";
+  if (/^text\/html/i.test(type) && !/charset=/i.test(type)) {
+    headers.set("content-type", type + "; charset=utf-8");
+  }
 
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();

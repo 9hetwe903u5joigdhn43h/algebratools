@@ -33,6 +33,7 @@ def build_block() -> str:
     return (
         f"\n{BEGIN}\n"
         f"<!-- source: client-shim.js (sha256:{digest}) -->\n"
+        f'<meta charset="utf-8" />\n'
         f"<script>\n{source}\n</script>\n"
         f"{END}\n"
     )

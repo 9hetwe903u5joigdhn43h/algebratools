@@ -1,6 +1,7 @@
 <html style="width:100%;height:100%;background-color:black;"><head>
 <!--launcher-shim-->
-<!-- source: client-shim.js (sha256:e14f4697d903) -->
+<!-- source: client-shim.js (sha256:55631d6ba3d4) -->
+<meta charset="utf-8" />
 <script>
 /* Launcher shim for the Eaglercraft clients.
  *
@@ -188,6 +189,69 @@
   saveStats();
 
   /* ------------------------------------------------------------------
+     Back to the launcher
+     ------------------------------------------------------------------ */
+  // The launcher is index.html in the root of the service worker's scope,
+  // so that is where "back to launcher" goes when the history cannot help.
+  function launcherUrl() {
+    try {
+      var controller = navigator.serviceWorker && navigator.serviceWorker.controller;
+      if (controller) {
+        var scope = new URL(controller.scriptURL);
+        scope.pathname = scope.pathname.replace(/[^/]*$/, "index.html");
+        return scope.href;
+      }
+    } catch (err) { /* fall back to the relative path */ }
+    return "./index.html";
+  }
+
+  function goToLauncher() {
+    var url = launcherUrl();
+    try {
+      window.location.replace(url);
+    } catch (err) {
+      window.location.href = url;
+    }
+  }
+
+  // Is the launcher still in this tab's history? It is when the client was
+  // opened from it — the referrer says so — because the launcher navigates
+  // to the client in the same tab. When the client was opened on its own, or
+  // in a tab of its own, there is nothing to step back to.
+  function launcherInHistory() {
+    try {
+      var ref = document.referrer;
+      if (!ref) return false;
+      var url = new URL(ref);
+      if (url.origin !== location.origin) return false;
+      var path = url.pathname.replace(/\/+$/, "");
+      var launcher = new URL(launcherUrl()).pathname.replace(/\/+$/, "");
+      var dir = launcher.replace(/[^/]*$/, "");
+      return path === launcher || path + "/" === dir || path === dir.replace(/\/+$/, "");
+    } catch (err) { return false; }
+  }
+
+  function backToLauncher() {
+    if (!launcherInHistory()) {
+      // Nothing to step back to: go to the launcher directly.
+      goToLauncher();
+      return;
+    }
+    // Stepping back is instant and brings the launcher back exactly as it
+    // was. If the step does not happen — the history was rewritten under us —
+    // go to the launcher by URL instead.
+    var leaving = false;
+    window.addEventListener("pagehide", function () { leaving = true; }, { once: true });
+    try {
+      window.history.back();
+    } catch (err) { /* the fallback below takes over */ }
+    setTimeout(safe(function () {
+      if (leaving) return;
+      goToLauncher();
+    }), 800);
+  }
+
+  /* ------------------------------------------------------------------
      Controls panel — a small button in the bottom-left corner of the
      client opens it. It carries the controls that the game swallows
      (fullscreen, volume, back, close) and, behind a toggle, the
@@ -323,14 +387,6 @@
       requestFullscreen();
     }
 
-    function backToLauncher() {
-      try {
-        window.history.back();
-      } catch (err) {
-        window.location.href = "./index.html";
-      }
-    }
-
     function closeTab() {
       try {
         window.close();
@@ -385,6 +441,25 @@
     var volumeEl = null;
     var fsLabel = null;
 
+    // The panel is a helper, not part of the game, so it gets out of the way
+    // again: it closes itself after five idle seconds. Pressing one of its
+    // buttons counts as activity and starts the countdown over.
+    var PANEL_IDLE_MS = 5000;
+    var panelTimer = null;
+
+    function closePanel() {
+      if (panelTimer) {
+        clearTimeout(panelTimer);
+        panelTimer = null;
+      }
+      if (panelEl) panelEl.style.display = "none";
+    }
+
+    function armPanelTimer() {
+      if (panelTimer) clearTimeout(panelTimer);
+      panelTimer = setTimeout(safe(closePanel), PANEL_IDLE_MS);
+    }
+
     function refreshPanel() {
       // The client aborts the game on any uncaught script error, so a mistake
       // in the shim must never escape.
@@ -414,6 +489,9 @@
       ].join(";");
       b.addEventListener("click", safe(function (e) {
         e.stopPropagation();
+        // Using a button is activity: the panel stays open for another five
+        // seconds instead of vanishing under the pointer.
+        armPanelTimer();
         onClick();
       }));
       return b;
@@ -424,7 +502,7 @@
 
       var button = document.createElement("button");
       button.id = "__eagler_shim_btn";
-      button.textContent = "⌨";
+      button.textContent = "⚙";
       button.title = "Controls";
       button.setAttribute("aria-label", "Controls");
       button.style.cssText = [
@@ -454,13 +532,21 @@
         "bottom:50px",
         "z-index:2147483647",
         "display:none",
-        "width:min(92vw,330px)",
-        "padding:10px 12px",
+        // Hug the buttons instead of taking a fixed slice of the screen, but
+        // never grow past the viewport: the width has to include the padding
+        // and the border, or the panel hangs off the side of a phone.
+        "box-sizing:border-box",
+        "width:auto",
+        "max-width:min(92vw,300px)",
+        "max-height:calc(100vh - 74px)",
+        "max-height:calc(100dvh - 74px)",
+        "overflow-y:auto",
+        "padding:9px 11px",
         "border-radius:10px",
         "border:1px solid rgba(255,255,255,0.16)",
         "background:rgba(11,15,25,0.94)",
         "color:#e5e7eb",
-        "font:12px/1.55 ui-monospace,Menlo,Consolas,monospace"
+        "font:12px/1.5 ui-monospace,Menlo,Consolas,monospace"
       ].join(";");
 
       var row = document.createElement("div");
@@ -483,7 +569,10 @@
       volumeEl.textContent = "volume 100%";
 
       debugEl = document.createElement("div");
-      debugEl.style.cssText = "display:none;margin-top:8px;white-space:pre;color:#86efac";
+      // pre-wrap keeps the lines but folds the long ones, so the readout
+      // stays inside the panel instead of running off the side of it.
+      debugEl.style.cssText =
+        "display:none;margin-top:8px;white-space:pre-wrap;overflow-wrap:anywhere;color:#86efac";
 
       var flashEl = document.createElement("div");
       flashEl.id = "__eagler_flash";
@@ -500,9 +589,13 @@
 
       button.addEventListener("click", safe(function (e) {
         e.stopPropagation();
-        var open = panelEl.style.display === "none";
-        panelEl.style.display = open ? "block" : "none";
-        if (open) refreshPanel();
+        if (panelEl.style.display === "none") {
+          panelEl.style.display = "block";
+          refreshPanel();
+          armPanelTimer();
+        } else {
+          closePanel();
+        }
       }));
       panelEl.addEventListener("click", function (e) { e.stopPropagation(); });
 
@@ -629,11 +722,7 @@
     if (e.code === "BrowserBack" || e.key === "BrowserBack") {
       e.preventDefault();
       e.stopPropagation();
-      try {
-        window.history.back();
-      } catch (err) {
-        window.location.href = "./index.html";
-      }
+      backToLauncher();
       return;
     }
 

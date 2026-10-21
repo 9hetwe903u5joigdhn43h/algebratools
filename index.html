@@ -267,17 +267,6 @@
       font-size: 0.9rem;
     }
 
-    .setting-row select,
-    .setting-row input[type="number"] {
-      background: #0b1120;
-      color: var(--text);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-      padding: 6px 8px;
-      font: inherit;
-      font-size: 0.85rem;
-    }
-
     .keybind-input {
       width: 110px;
       background: #0b1120;
@@ -310,12 +299,6 @@
       border-radius: 4px;
       padding: 1px 5px;
       font-size: 0.95em;
-    }
-
-    .setting-row input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--accent);
     }
 
     .section-title {
@@ -796,28 +779,6 @@
         <h2 id="settings-title">Settings</h2>
         <button class="icon-btn" id="settings-close" aria-label="Close settings">&#10005;</button>
       </div>
-      <p class="settings-note">The placeholder options are not wired up yet. The
-      keybinds below are saved and used by the client.</p>
-      <label class="setting-row">
-        <span>Placeholder: show client descriptions</span>
-        <input type="checkbox" id="setting-show-descriptions" checked />
-      </label>
-      <label class="setting-row">
-        <span>Placeholder: default display mode</span>
-        <select id="setting-display-mode">
-          <option value="fullscreen">Fullscreen</option>
-          <option value="windowed">Windowed</option>
-          <option value="auto">Automatic</option>
-        </select>
-      </label>
-      <label class="setting-row">
-        <span>Placeholder: launcher volume</span>
-        <input type="number" id="setting-volume" min="0" max="100" step="5" value="100" />
-      </label>
-      <label class="setting-row">
-        <span>Placeholder: confirm before launching</span>
-        <input type="checkbox" id="setting-confirm-launch" />
-      </label>
       <div class="settings-group">Keybinds (in the client)</div>
       <label class="setting-row">
         <span>Fullscreen on</span>

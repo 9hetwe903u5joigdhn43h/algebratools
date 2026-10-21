@@ -67,8 +67,10 @@ for each one:
 
 Combinations are normalised, so `ctrl+shift+l` is stored as `Ctrl+Shift+L`.
 
-Bump `CLIENT_CACHE` in `sw.js` when `client-shim.js` changes, so browsers
-pick up the new shim instead of serving the cached copy.
+The service worker injects the shim into the client page as it is served, so
+a change to `client-shim.js` reaches the clients without re-downloading them.
+Bump `CACHE_NAME` in `sw.js` when `client-shim.js` changes, so the new shim
+replaces the precached copy (and the worker picks it up straight away).
 
 ## Offline
 
