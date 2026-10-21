@@ -29,7 +29,7 @@ Deployed hosting must be HTTPS for Chrome to offer install on a real URL.
 
 `client-shim.js` is injected by the service worker while it serves an app
 page, so the app files themselves stay untouched and every entry gets the fix
-automatically. It runs before the app's own scripts and does two things:
+automatically. It runs before the app's own scripts and does three things:
 
 1. **Blocks the keyboard lock.** Some builds call `navigator.keyboard.lock()`
    to grab the keyboard exclusively. While that lock is held the browser stops
@@ -40,6 +40,13 @@ automatically. It runs before the app's own scripts and does two things:
    `navigator.keyboard.getLayoutMap()` is left alone, so non-QWERTY layouts
    still map key positions correctly.
 
+   The one exception is a scoped Escape lock (`navigator.keyboard.lock(
+   ['Escape'])`), which the shim lets through. While fullscreen that lock
+   means the page sees Escape: a single tap opens the in-game pause menu
+   without leaving fullscreen, and holding Escape for about 0.6 s leaves
+   fullscreen for good. A tap does nothing else, so an accidental Esc no
+   longer fights the browser.
+
 2. **Turns element fullscreen into window fullscreen.** A build that puts its
    own wrapper div into element fullscreen does not resize the layout
    viewport: the canvas keeps its old pixel size and renders stretched, and
@@ -48,8 +55,10 @@ automatically. It runs before the app's own scripts and does two things:
    viewport really resizes, the app re-lays out, and F11 / Escape toggle
    fullscreen cleanly.
 
-The shim also maps the hardware Back key to the launcher and makes F5 reload
-the app.
+   The client also enters fullscreen on its own on the first click or key
+   press, without a keybind.
+
+3. **Maps the hardware Back key to the launcher** and makes F5 reload the app.
 
 ### Keybinds
 

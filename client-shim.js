@@ -53,7 +53,8 @@
   // shim actually ran, and whether the game tried to lock the keyboard.
   var stats = {
     time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false,
-    fullscreenPatched: false, fsRequests: 0, fsOk: 0, fsError: "", escapeKeys: 0
+    fullscreenPatched: false, fsRequests: 0, fsOk: 0, fsError: "", escapeKeys: 0,
+    escLock: false
   };
 
   function saveStats() {
@@ -117,29 +118,49 @@
   /* ------------------------------------------------------------------
      1. Never actually lock the keyboard
      ------------------------------------------------------------------ */
+  var realKeyboardLock = null;
+  try { realKeyboardLock = window.Keyboard && Keyboard.prototype.lock; }
+  catch (err) { /* ignore */ }
+
+  // True while our own scoped Escape lock is engaged: the safety net must
+  // not drop it.
+  var escLockRequested = false;
+
+  // True only when the requested lock is a single "Escape" key — case
+  // insensitive. Everything else (including lock() with no arguments) keeps
+  // being blocked.
+  function isEscapeOnly(keys) {
+    return Array.isArray(keys) && keys.length === 1 &&
+      String(keys[0]).toLowerCase() === "escape";
+  }
+
   try {
     if (navigator.keyboard) {
       // Patch the instance *and* the prototype: a caller that grabbed
       // Keyboard.prototype.lock before the shim ran would otherwise still
       // reach the real implementation.
-      var noLock = function () {
+      function patchedLock(keys) {
+        if (isEscapeOnly(keys)) {
+          escLockRequested = true;
+          return realKeyboardLock.call(navigator.keyboard, keys);
+        }
         stats.lockCalls++;
         saveStats();
         warn("keyboard lock blocked — system shortcuts stay available");
         return Promise.resolve();
-      };
+      }
 
       try {
-        navigator.keyboard.lock = noLock;
+        navigator.keyboard.lock = patchedLock;
       } catch (err) { /* some browsers make the property read-only */ }
 
       try {
-        if (window.Keyboard && Keyboard.prototype) Keyboard.prototype.lock = noLock;
+        if (window.Keyboard && Keyboard.prototype) Keyboard.prototype.lock = patchedLock;
       } catch (err) { /* ignore */ }
 
       try {
         Object.defineProperty(navigator.keyboard, "lock", {
-          value: noLock,
+          value: patchedLock,
           writable: true,
           configurable: true
         });
@@ -165,6 +186,7 @@
       };
       setInterval(safe(function () {
         try {
+          if (escLockRequested) return;
           if (navigator.keyboard.locked) {
             stats.lockedSeen = true;
             saveStats();
@@ -174,6 +196,7 @@
       }), 500);
       window.addEventListener("keydown", safe(function () {
         try {
+          if (escLockRequested) return;
           if (navigator.keyboard.locked) release("keydown");
         } catch (err) { /* ignore */ }
       }), true);
@@ -182,6 +205,31 @@
 
   // Leave a trace so the launcher can confirm the shim actually ran.
   saveStats();
+
+  // Arm the scoped Escape lock when fullscreen starts, and release it when
+  // fullscreen ends. The lock engages silently — Chromium grants the
+  // keyboard-lock permission for a scoped single-key lock without a prompt.
+  function armEscLock() {
+    if (!navigator.keyboard || typeof navigator.keyboard.lock !== "function") return;
+    escLockRequested = true;
+    try {
+      var p = navigator.keyboard.lock(["Escape"]);   // passes through the patch
+      if (p && typeof p.then === "function") {
+        p.then(function () { stats.escLock = true; saveStats(); },
+               function () { stats.escLock = false; saveStats(); });
+      }
+    } catch (err) { /* ignore */ }
+  }
+
+  function disarmEscLock() {
+    escLockRequested = false;
+    stats.escLock = false;
+    try {
+      if (navigator.keyboard && typeof navigator.keyboard.unlock === "function") {
+        navigator.keyboard.unlock();
+      }
+    } catch (err) { /* ignore */ }
+  }
 
   /* ------------------------------------------------------------------
      Back to the launcher
@@ -364,13 +412,19 @@
       }
     }
 
+    function exitFullscreen() {
+      try {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen;
+        if (exit) exit.call(document);
+      } catch (err) { /* ignore */ }
+    }
+
     function toggleFullscreen() {
       try {
         var on = isFullscreen();
         wantFullscreen = !on;
         if (on) {
-          var exit = document.exitFullscreen || document.webkitExitFullscreen;
-          if (exit) exit.call(document);
+          exitFullscreen();
         } else {
           requestFullscreen();
         }
@@ -428,6 +482,8 @@
       lines.push("display-mode: " + displayMode());
       lines.push("worker controlling: " + (navigator.serviceWorker.controller ? "yes" : "no"));
       lines.push("audio master: " + (masterGain ? "yes" : "no"));
+      lines.push("esc lock: " + (stats.escLock ? "yes" : "no"));
+      lines.push("hold to exit: " + ESC_HOLD_MS + "ms");
       return lines.join("\n");
     }
 
@@ -601,19 +657,68 @@
 
     installAudioMaster();
 
-    // Sticky fullscreen. Chrome exits fullscreen when Escape is pressed and
-    // it never delivers that key to the page, so the exit cannot be
-    // intercepted. What we can do is notice the exit and put fullscreen back
-    // on the very next interaction, so an accidental Escape only costs one
-    // keypress.
+    // Sticky fullscreen for browsers without the Keyboard Lock API (Firefox):
+    // Chrome exits fullscreen on Escape and never delivers that key to the
+    // page, so the exit cannot be intercepted. What we can do is notice the
+    // exit and put fullscreen back on the next interaction — unless the exit
+    // was an intentional Escape hold.
+    // With the scoped Escape lock engaged, the page *does* see Escape: a tap
+    // opens the in-game menu without leaving fullscreen, and a hold (~0.6 s)
+    // leaves fullscreen for good.
+    var ESC_HOLD_MS = 600;
+    var escHeld = false;      // Escape is physically down
+    var escHoldTimer = null;
+
     document.addEventListener("fullscreenchange", safe(function () {
       if (isFullscreen()) {
         reenterPending = false;
-      } else if (wantFullscreen) {
-        reenterPending = true;
+        armEscLock();
+      } else {
+        disarmEscLock();
+        if (wantFullscreen) {
+          if (escHeld) {
+            // The browser left fullscreen as part of the Escape hold: treat
+            // the exit as intentional, do not re-enter.
+            wantFullscreen = false;
+            reenterPending = false;
+          } else {
+            // No key was seen (no lock support, or an unrelated exit): keep
+            // the old sticky behaviour.
+            reenterPending = true;
+          }
+        }
       }
       refreshPanel();
     }));
+
+    document.addEventListener("keydown", safe(function (e) {
+      if (e.key !== "Escape" && e.code !== "Escape") return;
+      if (!isFullscreen()) return;
+
+      if (e.repeat) {
+        // Swallow the auto-repeat while Esc is held, so the in-game menu
+        // does not flicker open and closed during the hold.
+        if (escHeld) { e.preventDefault(); e.stopPropagation(); }
+        return;
+      }
+
+      escHeld = true;
+      clearTimeout(escHoldTimer);
+      escHoldTimer = setTimeout(safe(function () {
+        escHoldTimer = null;
+        // An intentional exit: do not let the sticky re-enter undo it.
+        wantFullscreen = false;
+        reenterPending = false;
+        exitFullscreen();
+      }), ESC_HOLD_MS);
+    }), true);
+
+    document.addEventListener("keyup", safe(function (e) {
+      if (e.key !== "Escape" && e.code !== "Escape") return;
+      escHeld = false;
+      clearTimeout(escHoldTimer);
+      escHoldTimer = null;
+    }), true);
 
     function restoreFullscreen() {
       if (!reenterPending) return;
@@ -624,6 +729,23 @@
     document.addEventListener("mousedown", safe(restoreFullscreen), true);
     document.addEventListener("touchstart", safe(restoreFullscreen), true);
     document.addEventListener("keydown", safe(restoreFullscreen), true);
+
+    // Auto fullscreen on the first interaction. One-shot capture-phase
+    // handlers: requestFullscreen() still runs inside the user gesture, so
+    // Chrome allows it. The shim runs before the game's own scripts, so it
+    // sees the first click on the game's main menu and goes fullscreen there.
+    var autoFullscreenDone = false;
+
+    function autoFullscreen(e) {
+      if (autoFullscreenDone) return;
+      autoFullscreenDone = true;
+      if (isFullscreen()) return;
+      wantFullscreen = true;
+      requestFullscreen();
+    }
+
+    document.addEventListener("pointerdown", safe(autoFullscreen), true);
+    document.addEventListener("keydown", safe(autoFullscreen), true);
 
     // Configurable keybinds for the panel actions.
     window.addEventListener("keydown", safe(function (e) {
