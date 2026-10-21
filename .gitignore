@@ -1,0 +1,6 @@
+# Local crash reports exported from the client (never commit these).
+eaglercraft-recovered-crash.json
+eaglercraft26.crashJournal.v2
+eaglercraft26.lastCrashReport.v2
+crash-reports/
+*.crash.json

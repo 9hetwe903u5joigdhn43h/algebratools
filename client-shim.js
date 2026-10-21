@@ -35,6 +35,20 @@
     try { console.warn("[shim] " + Array.prototype.join.call(arguments, " ")); } catch (e) { /* ignore */ }
   }
 
+  // The client aborts the game on any uncaught script error, so every
+  // callback the shim installs is wrapped: a mistake here must never take
+  // the game down with it.
+  function safe(fn) {
+    return function () {
+      try {
+        return fn.apply(this, arguments);
+      } catch (err) {
+        warn("ignored error:", err);
+        return undefined;
+      }
+    };
+  }
+
   // Diagnostics: the launcher reads these back so we can tell whether the
   // shim actually ran, and whether the game tried to lock the keyboard.
   var stats = {
@@ -95,9 +109,9 @@
 
   try {
     // Settings changed in another tab: pick them up.
-    window.addEventListener("storage", function (e) {
+    window.addEventListener("storage", safe(function (e) {
       if (e.key === KEYBIND_STORAGE) keybinds = loadKeybinds();
-    });
+    }));
   } catch (err) { /* ignore */ }
 
   /* ------------------------------------------------------------------
@@ -149,7 +163,7 @@
           warn("keyboard lock released (" + why + ")");
         } catch (err) { /* ignore */ }
       };
-      setInterval(function () {
+      setInterval(safe(function () {
         try {
           if (navigator.keyboard.locked) {
             stats.lockedSeen = true;
@@ -157,12 +171,12 @@
             release("poll");
           }
         } catch (err) { /* ignore */ }
-      }, 500);
-      window.addEventListener("keydown", function () {
+      }), 500);
+      window.addEventListener("keydown", safe(function () {
         try {
           if (navigator.keyboard.locked) release("keydown");
         } catch (err) { /* ignore */ }
-      }, true);
+      }), true);
     }
   } catch (err) { /* ignore */ }
 
@@ -365,13 +379,20 @@
     var panelEl = null;
     var debugEl = null;
     var volumeEl = null;
+    var fsLabel = null;
 
     function refreshPanel() {
-      if (!panelEl || panelEl.style.display === "none") return;
-      if (debugEl && debugEl.style.display !== "none") debugEl.textContent = debugText();
-      if (volumeEl) volumeEl.textContent = "volume " + Math.round(volume * 100) + "%";
-      if (fsLabel) {
-        fsLabel.textContent = isFullscreen() ? "Exit fullscreen" : "Fullscreen";
+      // The client aborts the game on any uncaught script error, so a mistake
+      // in the shim must never escape.
+      try {
+        if (!panelEl || panelEl.style.display === "none") return;
+        if (debugEl && debugEl.style.display !== "none") debugEl.textContent = debugText();
+        if (volumeEl) volumeEl.textContent = "volume " + Math.round(volume * 100) + "%";
+        if (fsLabel) {
+          fsLabel.textContent = isFullscreen() ? "Exit fullscreen" : "Fullscreen";
+        }
+      } catch (err) {
+        warn("panel refresh failed:", err);
       }
     }
 
@@ -387,10 +408,10 @@
         "padding:5px 8px",
         "cursor:pointer"
       ].join(";");
-      b.addEventListener("click", function (e) {
+      b.addEventListener("click", safe(function (e) {
         e.stopPropagation();
         onClick();
-      });
+      }));
       return b;
     }
 
@@ -441,9 +462,11 @@
       var row = document.createElement("div");
       row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
 
-      row.appendChild(chip("Fullscreen", toggleFullscreen));
+      var fsButton = chip("Fullscreen", toggleFullscreen);
+      row.appendChild(fsButton);
       row.appendChild(chip("Launcher", backToLauncher));
-      var fsLabel = row.lastChild;
+      fsLabel = fsButton;
+
       var debugBtn = chip("Debug", function () {
         if (!debugEl) return;
         debugEl.style.display = debugEl.style.display === "none" ? "block" : "none";
@@ -471,17 +494,17 @@
       document.body.appendChild(panelEl);
       document.body.appendChild(button);
 
-      button.addEventListener("click", function (e) {
+      button.addEventListener("click", safe(function (e) {
         e.stopPropagation();
         var open = panelEl.style.display === "none";
         panelEl.style.display = open ? "block" : "none";
         if (open) refreshPanel();
-      });
+      }));
       panelEl.addEventListener("click", function (e) { e.stopPropagation(); });
 
-      setInterval(function () {
+      setInterval(safe(function () {
         if (panelEl && panelEl.style.display !== "none") refreshPanel();
-      }, 1000);
+      }), 1000);
     }
 
     installAudioMaster();
@@ -491,14 +514,14 @@
     // intercepted. What we can do is notice the exit and put fullscreen back
     // on the very next interaction, so an accidental Escape only costs one
     // keypress.
-    document.addEventListener("fullscreenchange", function () {
+    document.addEventListener("fullscreenchange", safe(function () {
       if (isFullscreen()) {
         reenterPending = false;
       } else if (wantFullscreen) {
         reenterPending = true;
       }
       refreshPanel();
-    });
+    }));
 
     function restoreFullscreen() {
       if (!reenterPending) return;
@@ -506,12 +529,12 @@
       if (wantFullscreen && !isFullscreen()) requestFullscreen();
     }
 
-    document.addEventListener("mousedown", restoreFullscreen, true);
-    document.addEventListener("touchstart", restoreFullscreen, true);
-    document.addEventListener("keydown", restoreFullscreen, true);
+    document.addEventListener("mousedown", safe(restoreFullscreen), true);
+    document.addEventListener("touchstart", safe(restoreFullscreen), true);
+    document.addEventListener("keydown", safe(restoreFullscreen), true);
 
     // Configurable keybinds for the panel actions.
-    window.addEventListener("keydown", function (e) {
+    window.addEventListener("keydown", safe(function (e) {
       // Never fire while the player is typing (the game's chat box).
       var el = e.target;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
@@ -551,10 +574,10 @@
           refreshPanel();
         }
       }
-    }, true);
+    }), true);
 
     // Volume keys, when the browser forwards them to the page.
-    window.addEventListener("keydown", function (e) {
+    window.addEventListener("keydown", safe(function (e) {
       var code = e.code || "";
       var key = e.key || "";
       if (code === "VolumeUp" || key === "AudioVolumeUp" || code === "XF86AudioRaiseVolume") {
@@ -566,7 +589,7 @@
         e.stopPropagation();
         adjustVolume(-0.1);
       }
-    }, true);
+    }), true);
 
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", buildPanel, { once: true });
@@ -596,7 +619,7 @@
   /* ------------------------------------------------------------------
      3. Back / reload keys
      ------------------------------------------------------------------ */
-  window.addEventListener("keydown", function (e) {
+  window.addEventListener("keydown", safe(function (e) {
     // Hardware back button (ChromeOS / Android). The browser's own default
     // for it is history navigation, so prevent it and do it ourselves.
     if (e.code === "BrowserBack" || e.key === "BrowserBack") {
@@ -617,5 +640,5 @@
       e.stopPropagation();
       window.location.reload();
     }
-  }, true);
+  }), true);
 })();
