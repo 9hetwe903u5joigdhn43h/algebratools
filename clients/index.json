@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T23:38:39Z",
+  "generated": "2026-10-22T00:27:18Z",
   "groups": [
     {
       "path": "recomended",
@@ -40,7 +40,7 @@
         "modded"
       ],
       "groupLabel": "Modded",
-      "size": 94115208
+      "size": 94119671
     },
     {
       "id": "modded/Voltan-26.2-U2.1",
@@ -55,7 +55,7 @@
         "modded"
       ],
       "groupLabel": "Modded",
-      "size": 81294264
+      "size": 81298727
     },
     {
       "id": "recomended/26.2-dev-0.6",
@@ -70,7 +70,7 @@
         "recomended"
       ],
       "groupLabel": "Recomended",
-      "size": 75602976
+      "size": 75607439
     },
     {
       "id": "wisp/26.2-dev-0.6-wisp",
@@ -85,7 +85,7 @@
         "wisp"
       ],
       "groupLabel": "Wisp",
-      "size": 77418467
+      "size": 77422930
     },
     {
       "id": "wisp/26.2-u2-wisp",
@@ -100,7 +100,7 @@
         "wisp"
       ],
       "groupLabel": "Wisp",
-      "size": 77596035
+      "size": 77600498
     }
   ],
   "defaultClient": "recomended/26.2-dev-0.6"
