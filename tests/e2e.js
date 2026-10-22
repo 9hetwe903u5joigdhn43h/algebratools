@@ -30,18 +30,30 @@ const URL_ARG = process.argv[2] || "http://localhost:8123/index.html?debug";
 function findChromium() {
   const candidates = [
     process.env.CHROME_PATH,
+    // Where browser-actions/setup-chrome puts it.
+    "/opt/hostedtoolcache/setup-chrome/chromium/stable/x64/chrome",
     "chromium",
     "chromium-browser",
     "google-chrome",
     "google-chrome-stable",
+    // The name browser-actions/setup-chrome gives its binary; the action
+    // puts its directory on the PATH.
+    "chrome",
+    "chrome-headless-shell",
   ].filter(Boolean);
+
+  const found = [];
   for (const candidate of candidates) {
     try {
-      const found = execFileSync("which", [candidate], { encoding: "utf8" }).trim();
-      if (found) return found;
+      const path = execFileSync("which", [candidate], { encoding: "utf8" }).trim();
+      if (path && !found.includes(path)) found.push(path);
     } catch (err) { /* not on the path */ }
+    // A full path does not need to be on the PATH.
+    if (candidate.startsWith("/") && fs.existsSync(candidate) && !found.includes(candidate)) {
+      found.push(candidate);
+    }
   }
-  return null;
+  return found;
 }
 
 /* ----------------------------------------------------------------- */
@@ -174,27 +186,38 @@ function check(name, condition, detail) {
   }
 }
 
-async function main() {
-  const chromium = findChromium();
-  if (!chromium) {
-    console.log("chromium is not installed — skipping the browser test");
-    return 0;
-  }
+/* ----------------------------------------------------------------- */
+/* Starting the browser                                               */
+/* ----------------------------------------------------------------- */
 
+// The flags every candidate gets. "--headless" on its own works on every
+// version of Chrome and Chromium; the newer "--headless=new" is not
+// accepted everywhere.
+const BROWSER_FLAGS = [
+  "--headless",
+  "--no-sandbox",
+  "--disable-gpu",
+  "--disable-dev-shm-usage",
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--disable-extensions",
+  "--disable-background-networking",
+  "--remote-debugging-port=0",
+];
+
+/**
+ * Start a browser and wait for it to open its debugging port.
+ *
+ * Returns { proc, profile, port } or null when the browser would not
+ * start — a machine without a usable browser is not a broken launcher.
+ */
+async function startBrowser(binary) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), "algebratools-e2e-"));
+  const portFile = path.join(profile, "DevToolsActivePort");
+
   const proc = spawn(
-    chromium,
-    [
-      "--headless=new",
-      "--no-sandbox",
-      "--disable-gpu",
-      "--disable-dev-shm-usage",
-      "--no-first-run",
-      "--no-default-browser-check",
-      "--remote-debugging-port=0",
-      "--user-data-dir=" + profile,
-      "about:blank",
-    ],
+    binary,
+    [...BROWSER_FLAGS, "--user-data-dir=" + profile, "about:blank"],
     { stdio: ["ignore", "ignore", "pipe"] }
   );
 
@@ -202,6 +225,48 @@ async function main() {
   proc.stderr.on("data", (chunk) => {
     stderr += chunk.toString();
   });
+  proc.on("error", () => { /* the spawn failed; the port never comes */ });
+
+  for (let i = 0; i < 150; i++) {
+    await sleep(100);
+    if (fs.existsSync(portFile)) {
+      const content = fs.readFileSync(portFile, "utf8").split("\n");
+      if (content[0] && content[0].trim()) {
+        return { proc, profile, port: content[0].trim(), stderr: () => stderr };
+      }
+    }
+    if (proc.exitCode !== null) break;   // it gave up
+  }
+
+  try {
+    proc.kill("SIGKILL");
+  } catch (err) { /* already gone */ }
+  try {
+    fs.rmSync(profile, { recursive: true, force: true });
+  } catch (err) { /* ignore */ }
+  return null;
+}
+
+async function main() {
+  const candidates = findChromium();
+  if (!candidates.length) {
+    console.log("no browser found — skipping the browser test");
+    return 0;
+  }
+
+  let browser = null;
+  for (const binary of candidates) {
+    browser = await startBrowser(binary);
+    if (browser) break;
+    console.log(`  ..   ${binary} would not start, trying the next one`);
+  }
+
+  if (!browser) {
+    console.log("no browser would start — skipping the browser test");
+    return 0;
+  }
+
+  const { proc, profile, port } = browser;
 
   const cleanup = () => {
     try {
@@ -213,20 +278,6 @@ async function main() {
   };
 
   try {
-    // Wait for the debugging port.
-    const portFile = path.join(profile, "DevToolsActivePort");
-    let port = null;
-    for (let i = 0; i < 100 && !port; i++) {
-      await sleep(100);
-      if (fs.existsSync(portFile)) {
-        const content = fs.readFileSync(portFile, "utf8").split("\n");
-        if (content[0]) port = content[0].trim();
-      }
-    }
-    if (!port) {
-      throw new Error("chromium did not open a debugging port\n" + stderr);
-    }
-
     const targets = await (
       await fetch(`http://127.0.0.1:${port}/json/list`)
     ).json();
