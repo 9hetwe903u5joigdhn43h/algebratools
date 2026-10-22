@@ -2051,6 +2051,26 @@
       launchLoading.classList.add("visible");
     }
 
+    function hideLaunchLoading() {
+      launchLoading.classList.remove("visible");
+      launchLoadingTitle.textContent = "Starting…";
+      launchLoadingStatus.textContent = "Downloading the client…";
+      launchProgressBar.style.width = "0%";
+      launchProgress.classList.remove("indeterminate");
+    }
+
+    // The launcher goes away when a client starts and comes back when the
+    // user steps back to it. The browser then restores it from the
+    // back/forward cache — exactly as it was left, with the "Starting
+    // <client>…" overlay still on top and the launch button still
+    // disabled. That is a dead screen: the launcher is there, but nothing
+    // can be clicked. Take the overlay away and put the button back.
+    window.addEventListener("pageshow", (event) => {
+      if (!event.persisted) return;
+      hideLaunchLoading();
+      applyDisplayMode();
+    });
+
     // The service worker reports how much of the client has arrived, and
     // keeps track of the offline copies.
     if ("serviceWorker" in navigator) {

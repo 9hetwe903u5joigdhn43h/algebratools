@@ -13,7 +13,7 @@
 
 // Bump this whenever the launcher shell changes. Bumping purges every old
 // launcher cache during activation, so no stale shell can survive.
-const CACHE_NAME = "eaglercraft-launcher-v8";
+const CACHE_NAME = "eaglercraft-launcher-v9";
 const ASSETS = [
   "./",
   "./index.html",

@@ -197,6 +197,16 @@ scripts and does three things:
 
 3. **Maps the hardware Back key to the launcher** and makes F5 reload the app.
 
+   The **Launcher** button in the corner panel (and the `Alt+\` keybind) go
+   straight to the launcher page — they do not step back through the
+   history. Stepping back would restore the launcher from the browser's
+   back/forward cache, exactly as it was left: with the "Starting
+   \<client\>…" overlay still frozen on top of it and the launch button
+   still disabled. That is a dead screen — the launcher is visible, but
+   nothing on it can be clicked. The launcher now also cleans that overlay
+   up when it comes back from the cache, so the browser's own Back button
+   works the same way.
+
 ### Keybinds
 
 The client has keybinds for the panel actions. They are stored in

@@ -257,41 +257,15 @@
     }
   }
 
-  // Is the launcher still in this tab's history? It is when the client was
-  // opened from it — the referrer says so — because the launcher navigates
-  // to the client in the same tab. When the client was opened on its own, or
-  // in a tab of its own, there is nothing to step back to.
-  function launcherInHistory() {
-    try {
-      var ref = document.referrer;
-      if (!ref) return false;
-      var url = new URL(ref);
-      if (url.origin !== location.origin) return false;
-      var path = url.pathname.replace(/\/+$/, "");
-      var launcher = new URL(launcherUrl()).pathname.replace(/\/+$/, "");
-      var dir = launcher.replace(/[^/]*$/, "");
-      return path === launcher || path + "/" === dir || path === dir.replace(/\/+$/, "");
-    } catch (err) { return false; }
-  }
-
+  // Go back to the launcher.
   function backToLauncher() {
-    if (!launcherInHistory()) {
-      // Nothing to step back to: go to the launcher directly.
-      goToLauncher();
-      return;
-    }
-    // Stepping back is instant and brings the launcher back exactly as it
-    // was. If the step does not happen — the history was rewritten under us —
-    // go to the launcher by URL instead.
-    var leaving = false;
-    window.addEventListener("pagehide", function () { leaving = true; }, { once: true });
-    try {
-      window.history.back();
-    } catch (err) { /* the fallback below takes over */ }
-    setTimeout(safe(function () {
-      if (leaving) return;
-      goToLauncher();
-    }), 800);
+    // Straight to the launcher page, never through the history. Stepping
+    // back restores the launcher from the back/forward cache — exactly as it
+    // was left, with the "Starting <client>…" overlay still frozen on top
+    // of it and the launch button still disabled. That is a dead screen:
+    // the launcher is visible, but nothing on it can be clicked. A fresh
+    // load of the launcher is clean.
+    goToLauncher();
   }
 
   /* ------------------------------------------------------------------
