@@ -10,6 +10,7 @@ at any time without touching the launcher.
     ./build-index.py             # inject + write clients/index.json
     ./build-index.py --check     # only report whether the index is current
     ./build-index.py --no-inject # write the index, leave the builds alone
+    ./build-index.py --recommended <id>  # mark a client as the recommended one
 """
 
 import argparse
@@ -28,6 +29,10 @@ def main() -> int:
     parser.add_argument("--default", metavar="ID",
                         help="make this client the default one "
                              "(use 'none' to clear it)")
+    parser.add_argument("--recommended", metavar="ID",
+                        help="mark this client as the recommended one — it can "
+                             "live in any folder (use 'none' to clear the "
+                             "mark on every client)")
     args = parser.parse_args()
 
     if not clientlib.CLIENTS_DIR.is_dir():
@@ -37,6 +42,19 @@ def main() -> int:
         wanted = "" if args.default.strip().lower() in ("none", "-") else args.default.strip()
         path = clientlib.write_default(wanted)
         print(f"default: {wanted or '(none)'} -> {path.relative_to(clientlib.HERE)}")
+
+    if args.recommended is not None:
+        wanted = args.recommended.strip()
+        if wanted.lower() in ("none", "-"):
+            for path in clientlib.clear_recommended():
+                print(f"unrecommended: {path.relative_to(clientlib.HERE)}")
+            print("recommended: (none)")
+        else:
+            try:
+                path = clientlib.set_recommended(wanted, True)
+            except ValueError as err:
+                raise SystemExit(str(err))
+            print(f"recommended: {wanted} -> {path.relative_to(clientlib.HERE)}")
 
     # 1. The shim goes into the builds first, so the sizes the catalog
     #    reports are the sizes that are actually served.

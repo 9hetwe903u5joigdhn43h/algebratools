@@ -67,8 +67,8 @@ sidecar still shows up — it just gets a generic name.
 ### The default client
 
 ```
-./build-index.py --default recomended/26.2-dev-0.6   # set it
-./build-index.py --default none                       # clear it
+./build-index.py --default vanilla/26.2-dev-0.6   # set it
+./build-index.py --default none                   # clear it
 ```
 
 That writes `clients/_default.json` and the id goes into the catalog as
@@ -78,6 +78,28 @@ The launcher also remembers a default per browser (`localStorage`), and that
 one wins over the catalog's — so a client you pick with **Set default** in
 the details modal stays your default. The catalog default is what a fresh
 browser gets.
+
+### The recommended client
+
+The recommended client is **not** a folder of its own any more — any client
+in any folder can be the recommended one. The mark lives in the metadata
+sidecar next to the build:
+
+```json
+{
+  "name": "Eaglercraft 26.2 Dev 0.6",
+  "recommended": true
+}
+```
+
+```
+./build-index.py --recommended vanilla/26.2-dev-0.6   # mark it
+./build-index.py --recommended none                    # clear the mark everywhere
+```
+
+The launcher shows a **★ Recommended** entry in the sidebar that lists every
+recommended client, no matter which folder it sits in, and the cards carry a
+*Recommended* badge.
 
 ### Adding a client
 
@@ -98,7 +120,8 @@ minute if it is already open).
 
 Options: `--slug` for the file name, `--icon` for the card icon, `--move`
 to move the build instead of copying it, `--force` to overwrite an existing
-entry, `--default` to make it the default client.
+entry, `--default` to make it the default client, `--recommended` to make it
+the recommended one.
 
 ### The catalog scripts
 
@@ -108,6 +131,7 @@ entry, `--default` to make it the default client.
 | `./build-index.py --check` | Reports whether the catalog is out of date |
 | `./build-index.py --no-inject` | Writes the catalog without touching the builds |
 | `./build-index.py --default <id>` | Sets the client that opens selected |
+| `./build-index.py --recommended <id>` | Marks the recommended client (any folder) |
 | `./inject-shim.py` | Injects the shim into every build under `clients/` |
 | `./inject-shim.py --check` | Reports which builds are out of date |
 | `./add-client.py` | Adds a build to the catalog in one step |

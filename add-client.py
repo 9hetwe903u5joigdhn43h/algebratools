@@ -18,6 +18,8 @@ Options:
     --move      move the build instead of copying it
     --force     overwrite an existing client with the same slug
     --no-build  skip the catalog rebuild (do it yourself later)
+    --default   also make it the client that opens selected
+    --recommended  also make it the recommended client
 """
 
 import argparse
@@ -46,6 +48,8 @@ def main() -> int:
     parser.add_argument("--no-build", action="store_true", help="do not rebuild the catalog")
     parser.add_argument("--default", action="store_true",
                         help="also make this the default client")
+    parser.add_argument("--recommended", action="store_true",
+                        help="also make this the recommended client")
     args = parser.parse_args()
 
     source = pathlib.Path(args.build).expanduser().resolve()
@@ -88,6 +92,8 @@ def main() -> int:
         meta["author"] = args.author.strip()
     if args.icon:
         meta["icon"] = args.icon.strip()
+    if args.recommended:
+        meta["recommended"] = True
     sidecar.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
                        encoding="utf-8")
     print(f"meta:  {sidecar.relative_to(clientlib.HERE)}")

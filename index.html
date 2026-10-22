@@ -870,6 +870,12 @@
       color: #7dd3fc;
     }
 
+    .badge.recommended {
+      background: rgba(250, 204, 21, 0.14);
+      border-color: rgba(250, 204, 21, 0.35);
+      color: #fde68a;
+    }
+
     /* --------------------------------------------------------------
        The client details modal
        -------------------------------------------------------------- */
@@ -1200,7 +1206,8 @@
     let pwaEnforced = false;
 
     // What the sidebar is showing: "" = everything, "favorites" = the
-    // starred ones, otherwise the path of a folder.
+    // starred ones, VIEW_RECOMMENDED = the recommended ones, otherwise the
+    // path of a folder.
     let activeGroup = "";
     let searchTerm = "";
 
@@ -1226,6 +1233,11 @@
 
     const STORAGE_FAVORITES = "eaglercraft.launcher.favorites";
     const STORAGE_DEFAULT = "eaglercraft.launcher.defaultClient";
+
+    // The view that lists the recommended clients. It is not a folder — the
+    // recommended client can sit in any folder — so it gets a name that can
+    // never collide with a folder path.
+    const VIEW_RECOMMENDED = "@recommended";
 
     const clientList = document.getElementById("client-list");
     const clientTree = document.getElementById("client-tree");
@@ -1353,6 +1365,7 @@
         icon: c.icon || "",
         groupPath: Array.isArray(c.groupPath) ? c.groupPath : [],
         groupLabel: c.groupLabel || "",
+        recommended: c.recommended === true || c.recommended === "true",
         size: Number(c.size) || 0
       }));
       groups = (data.groups || []).map((g) => ({
@@ -1378,7 +1391,8 @@
 
     function catalogSignature(list, groupList) {
       return list.map((c) =>
-        [c.id, c.name, c.version, c.author, c.description, c.icon, c.url].join("|")
+        [c.id, c.name, c.version, c.author, c.description, c.icon, c.url,
+         c.recommended ? "rec" : ""].join("|")
       ).join("\n") + "\n--\n" + groupList.map((g) => g.path + "|" + g.label).join("\n");
     }
 
@@ -1461,6 +1475,17 @@
         "★ Favorites", favCount, activeGroup === "favorites", 0,
         () => { activeGroup = "favorites"; renderTree(); renderClients(); }));
 
+      // The recommended clients, wherever they live.
+      const recCount = clients.filter((c) => c.recommended).length;
+      if (recCount) {
+        clientTree.appendChild(treeButton(
+          "★ Recommended", recCount, activeGroup === VIEW_RECOMMENDED, 0,
+          () => { activeGroup = VIEW_RECOMMENDED; renderTree(); renderClients(); }));
+      } else if (activeGroup === VIEW_RECOMMENDED) {
+        // The last recommended client is gone — fall back to everything.
+        activeGroup = "";
+      }
+
       const walk = (node, depth) => {
         for (const child of node.children) {
           clientTree.appendChild(treeButton(
@@ -1493,6 +1518,8 @@
       let list = clients;
       if (activeGroup === "favorites") {
         list = list.filter((c) => favorites.has(c.id));
+      } else if (activeGroup === VIEW_RECOMMENDED) {
+        list = list.filter((c) => c.recommended);
       } else if (activeGroup) {
         list = list.filter((c) => {
           const path = (c.groupPath || []).join("/");
@@ -1506,7 +1533,9 @@
     // Which sub-folder a client belongs to, relative to what is on screen.
     function groupKeyFor(client) {
       const path = client.groupPath || [];
-      if (activeGroup === "favorites") return path[0] || "";
+      if (activeGroup === "favorites" || activeGroup === VIEW_RECOMMENDED) {
+        return path[0] || "";
+      }
       const prefix = activeGroup ? activeGroup.split("/") : [];
       if (path.length <= prefix.length) return "";
       return path[prefix.length];
@@ -1515,6 +1544,7 @@
     function headingLabel(key, count) {
       if (!key) {
         if (activeGroup === "favorites") return "Starred clients (" + count + ")";
+        if (activeGroup === VIEW_RECOMMENDED) return "Recommended clients (" + count + ")";
         if (activeGroup) {
           // The clients that sit directly in the selected folder.
           const meta = treeNodes.get(activeGroup);
@@ -1529,7 +1559,7 @@
 
     // The full path of a bucket, so it can be looked up in the group list.
     function bucketPath(key) {
-      if (activeGroup === "favorites") return key || "";
+      if (activeGroup === "favorites" || activeGroup === VIEW_RECOMMENDED) return key || "";
       if (!key) return activeGroup || "";
       return activeGroup ? activeGroup + "/" + key : key;
     }
@@ -1594,6 +1624,12 @@
         const badge = document.createElement("span");
         badge.className = "badge";
         badge.textContent = "Default";
+        nameRow.appendChild(badge);
+      }
+      if (c.recommended) {
+        const badge = document.createElement("span");
+        badge.className = "badge recommended";
+        badge.textContent = "Recommended";
         nameRow.appendChild(badge);
       }
       if (isOffline) {
@@ -1815,6 +1851,7 @@
       modalFacts.innerHTML = "";
       const facts = [];
       facts.push(["Folder", client.groupPath.length ? client.groupPath.join(" / ") : "—"]);
+      if (client.recommended) facts.push(["Recommended", "yes"]);
       if (client.size) facts.push(["Size", formatBytes(client.size)]);
       facts.push(["File", client.url]);
       for (const [label, value] of facts) {

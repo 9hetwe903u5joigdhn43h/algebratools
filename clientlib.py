@@ -212,6 +212,74 @@ def group_order(group_dir: pathlib.Path) -> int:
     return order if isinstance(order, (int, float)) else 0
 
 
+def is_recommended(value) -> bool:
+    """Whether a sidecar value marks the client as the recommended one."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "on", "1")
+    return False
+
+
+def sidecar_path(client_id: str, root=None) -> pathlib.Path:
+    """The metadata sidecar of a client id ('folder/name' -> 'folder/name.json')."""
+    root = pathlib.Path(root) if root else CLIENTS_DIR
+    parts = [part for part in str(client_id).split("/") if part]
+    if not parts:
+        raise ValueError("no client id given")
+    return root.joinpath(*parts[:-1]) / (parts[-1] + ".json")
+
+
+def set_recommended(client_id: str, value: bool = True, root=None) -> pathlib.Path:
+    """Mark a client as the recommended one, or clear the mark.
+
+    The mark lives in the client's own metadata sidecar, so any client in any
+    folder can be recommended — it does not need a folder of its own.
+
+    Returns the path of the sidecar that was written.
+    """
+    root = pathlib.Path(root) if root else CLIENTS_DIR
+    parts = [part for part in str(client_id).split("/") if part]
+    if not parts:
+        raise ValueError("no client id given")
+
+    build = root.joinpath(*parts[:-1]) / (parts[-1] + ".html")
+    if not build.is_file():
+        raise ValueError(f"no such client: {client_id}")
+
+    path = sidecar_path(client_id, root)
+    meta = load_json(path)
+    if not isinstance(meta, dict):
+        meta = {}
+    if value:
+        meta["recommended"] = True
+    else:
+        meta.pop("recommended", None)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+    return path
+
+
+def clear_recommended(root=None) -> list:
+    """Take the recommended mark off every client.
+
+    Returns the sidecars that were changed.
+    """
+    root = pathlib.Path(root) if root else CLIENTS_DIR
+    touched = []
+    for path in iter_client_files(root):
+        sidecar = path.with_suffix(".json")
+        meta = load_json(sidecar)
+        if not isinstance(meta, dict) or "recommended" not in meta:
+            continue
+        meta.pop("recommended", None)
+        sidecar.write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
+                           encoding="utf-8")
+        touched.append(sidecar)
+    return touched
+
+
 def read_default(root=None) -> str:
     """The client id that opens selected by default ("" when there is none)."""
     root = pathlib.Path(root) if root else CLIENTS_DIR
@@ -300,6 +368,7 @@ def build_catalog(root=None):
             "group": gpath[0] if gpath else "",
             "groupPath": gpath,
             "groupLabel": labels[-1] if labels else "Ungrouped",
+            "recommended": is_recommended(sidecar.get("recommended")),
             "size": size,
         })
 

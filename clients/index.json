@@ -1,9 +1,9 @@
 {
-  "generated": "2026-10-22T00:27:18Z",
+  "generated": "2026-10-22T01:19:22Z",
   "groups": [
     {
-      "path": "recomended",
-      "label": "Recomended",
+      "path": "vanilla",
+      "label": "Vanilla",
       "icon": "icons/icon-192.png",
       "order": 0,
       "count": 1,
@@ -40,6 +40,7 @@
         "modded"
       ],
       "groupLabel": "Modded",
+      "recommended": false,
       "size": 94119671
     },
     {
@@ -55,21 +56,23 @@
         "modded"
       ],
       "groupLabel": "Modded",
+      "recommended": false,
       "size": 81298727
     },
     {
-      "id": "recomended/26.2-dev-0.6",
-      "url": "clients/recomended/26.2-dev-0.6.html",
+      "id": "vanilla/26.2-dev-0.6",
+      "url": "clients/vanilla/26.2-dev-0.6.html",
       "name": "Eaglercraft 26.2 Dev 0.6",
       "version": "26.2 Dev 0.6",
       "author": "o_xer",
       "description": "Minecraft 26.2 in the browser",
       "icon": "icons/icon-192.png",
-      "group": "recomended",
+      "group": "vanilla",
       "groupPath": [
-        "recomended"
+        "vanilla"
       ],
-      "groupLabel": "Recomended",
+      "groupLabel": "Vanilla",
+      "recommended": true,
       "size": 75607439
     },
     {
@@ -85,6 +88,7 @@
         "wisp"
       ],
       "groupLabel": "Wisp",
+      "recommended": false,
       "size": 77422930
     },
     {
@@ -100,8 +104,9 @@
         "wisp"
       ],
       "groupLabel": "Wisp",
+      "recommended": false,
       "size": 77600498
     }
   ],
-  "defaultClient": "recomended/26.2-dev-0.6"
+  "defaultClient": "vanilla/26.2-dev-0.6"
 }
