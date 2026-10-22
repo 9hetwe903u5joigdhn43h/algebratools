@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-22T01:19:22Z",
+  "generated": "2026-10-22T01:19:49Z",
   "groups": [
     {
       "path": "vanilla",
@@ -56,7 +56,7 @@
         "modded"
       ],
       "groupLabel": "Modded",
-      "recommended": false,
+      "recommended": true,
       "size": 81298727
     },
     {
