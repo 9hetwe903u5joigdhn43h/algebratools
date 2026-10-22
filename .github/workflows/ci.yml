@@ -1,0 +1,69 @@
+name: Tests
+
+# The launcher, the service worker and the catalog are one unit: a change
+# to any of them can break the others. The test suite checks that they
+# still agree, and that the catalog really is what is in clients/.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # The browser test drives a real chromium over the DevTools
+      # protocol, so it needs one. The GitHub runners have Chrome; if the
+      # setup fails the browser test skips itself rather than failing the
+      # whole run.
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+        continue-on-error: true
+        with:
+          chrome-version: stable
+
+      # The Python tests (the catalog tooling), the launcher tests (the
+      # real launcher script in a DOM stub), the browser test (a real
+      # chromium) and the asset tests (the manifest, the service worker,
+      # the catalog).
+      - name: Run the test suite
+        run: ./test.py --verbose
+
+      # The slow half: the catalog has to be exactly what is in clients/,
+      # and every build has to carry the current shim. The build is
+      # regenerated and the result compared — a diff means the catalog was
+      # committed stale.
+      - name: Check that the catalog and the builds are in sync
+        run: |
+          ./build-index.py
+          if ! git diff --quiet -- clients/; then
+            echo "::error::The client catalog is out of date. Run ./build-index.py and commit clients/index.json."
+            git --no-pager diff --stat -- clients/
+            exit 1
+          fi
+          echo "The catalog and the builds are in sync."

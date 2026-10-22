@@ -40,6 +40,13 @@ jobs:
       - name: Rebuild the catalog
         run: ./build-index.py
 
+      # A broken catalog is worse than a stale one: the launcher would
+      # show the wrong clients. Fail here rather than commit it. The
+      # browser test is left to the tests workflow, so a flaky browser
+      # cannot stop the catalog from being rebuilt.
+      - name: Run the test suite
+        run: ./test.py --no-browser
+
       - name: Show what changed
         run: git --no-pager diff --stat -- clients/
 

@@ -13,7 +13,7 @@
 
 // Bump this whenever the launcher shell changes. Bumping purges every old
 // launcher cache during activation, so no stale shell can survive.
-const CACHE_NAME = "eaglercraft-launcher-v9";
+const CACHE_NAME = "eaglercraft-launcher-v10";
 const ASSETS = [
   "./",
   "./index.html",
@@ -59,26 +59,29 @@ const SHELL_PATHS = ["./", "./index.html"].map(
   (p) => new URL(p, self.registration.scope).pathname
 );
 
+// Put the launcher shell into the cache. Used on install, and again after
+// the cache was cleared from the diagnostics panel.
+async function precacheShell() {
+  const cache = await caches.open(CACHE_NAME);
+  // One missing asset must never take the whole worker down with it:
+  // cache.addAll() rejects as a whole, which would leave the launcher
+  // without a controller — no shim, no offline, nothing.
+  const results = await Promise.allSettled(ASSETS.map(async (asset) => {
+    const url = new URL(asset, self.registration.scope).href;
+    const res = await fetch(url, { cache: "reload" });
+    if (!res.ok) throw new Error(asset + " -> HTTP " + res.status);
+    await cache.put(url, res);
+  }));
+  const failed = results
+    .map((r, i) => (r.status === "rejected" ? ASSETS[i] + ": " + r.reason : null))
+    .filter(Boolean);
+  if (failed.length) console.warn("[sw] could not precache:", failed);
+  return { ok: failed.length === 0, failed: failed };
+}
+
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE_NAME);
-      // One missing asset must never take the whole worker down with it:
-      // cache.addAll() rejects as a whole, which would leave the launcher
-      // without a controller — no shim, no offline, nothing.
-      const results = await Promise.allSettled(ASSETS.map(async (asset) => {
-        const url = new URL(asset, self.registration.scope).href;
-        const res = await fetch(url, { cache: "reload" });
-        if (!res.ok) throw new Error(asset + " -> HTTP " + res.status);
-        await cache.put(url, res);
-      }));
-      const failed = results
-        .map((r, i) => (r.status === "rejected" ? ASSETS[i] + ": " + r.reason : null))
-        .filter(Boolean);
-      if (failed.length) console.warn("[sw] could not precache:", failed);
-    })()
-  );
+  event.waitUntil(precacheShell());
 });
 
 self.addEventListener("activate", (event) => {
@@ -376,8 +379,93 @@ self.addEventListener("message", (event) => {
     event.waitUntil(uncacheClient(msg.url));
   } else if (msg.type === "offline-status") {
     event.waitUntil(offlineStatus());
+  } else if (msg.type === "worker-info") {
+    event.waitUntil(workerInfo(msg.channel).then((payload) => {
+      reply(event, msg.channel, payload);
+    }));
+  } else if (msg.type === "clear-caches") {
+    event.waitUntil(clearCaches(msg.what).then((payload) => {
+      reply(event, msg.channel, payload);
+    }));
   }
 });
+
+// Answer a question from the launcher's diagnostics panel.
+function reply(event, channel, payload) {
+  if (!channel) return;
+  const message = { type: "worker-reply", channel: channel, payload: payload };
+  try {
+    const port = event.ports && event.ports[0];
+    if (port) {
+      port.postMessage(message);
+      return;
+    }
+  } catch (err) { /* fall through to the source */ }
+  try {
+    if (event.source && typeof event.source.postMessage === "function") {
+      event.source.postMessage(message);
+      return;
+    }
+  } catch (err) { /* the client went away */ }
+  // Last resort: the launcher may be listening on every window.
+  broadcast(message);
+}
+
+// Everything the worker knows about itself and its caches. The launcher
+// cannot work this out on its own: it does not know the offline budget,
+// and the sizes of the cached builds only live in the offline index.
+async function workerInfo() {
+  const cache = await caches.open(CLIENT_CACHE);
+  const index = await readOfflineIndex(cache);
+  const names = await caches.keys();
+  // Not called "caches": that would shadow the caches API inside this
+  // function and break the loop below.
+  const cacheList = [];
+  for (const name of names) {
+    const open = await caches.open(name);
+    const keys = await open.keys();
+    cacheList.push({ name: name, entries: keys.length });
+  }
+  return {
+    cacheName: CACHE_NAME,
+    clientCache: CLIENT_CACHE,
+    budget: OFFLINE_BUDGET,
+    offline: {
+      bytes: index.bytes || 0,
+      count: index.entries.length,
+      entries: index.entries.map((e) => ({
+        url: e.url,
+        path: scopeRelative(e.url),
+        size: e.size || 0
+      }))
+    },
+    caches: cacheList
+  };
+}
+
+// Clear the caches the launcher asked for. "launcher" is the precached
+// shell, "clients" is the offline copies, "all" is both.
+async function clearCaches(what) {
+  const target = what || "all";
+  const cleared = [];
+  try {
+    if (target === "launcher" || target === "all") {
+      await caches.delete(CACHE_NAME);
+      cleared.push(CACHE_NAME);
+      // Put the shell straight back, so the launcher keeps working
+      // offline after the cache was cleared.
+      await precacheShell();
+    }
+    if (target === "clients" || target === "all") {
+      await caches.delete(CLIENT_CACHE);
+      cleared.push(CLIENT_CACHE);
+    }
+  } catch (err) {
+    return { ok: false, error: String(err), cleared: cleared };
+  }
+  broadcast({ type: "offline-removed", url: "*", reason: "user" });
+  return { ok: true, cleared: cleared };
+}
 
 // ---------------------------------------------------------------------------
 // Fetch handling

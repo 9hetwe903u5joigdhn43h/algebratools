@@ -16,10 +16,57 @@ Then open `http://localhost:8000` in Chrome.
 
 Deployed hosting must be HTTPS for Chrome to offer install on a real URL.
 
+## Run the tests
+
+```
+./test.py            # everything that is quick
+./test.py --slow     # also the checks that read every build
+./test.py -v         # verbose
+./test.py clientlib  # only the tests whose name matches
+```
+
+The suite has three parts, all local — nothing is uploaded anywhere:
+
+| Part | What it covers |
+|---|---|
+| `tests/test_clientlib.py` | the catalog tooling: the shim injection is idempotent, the catalog describes the folder tree, the default and recommended marks survive a round trip |
+| `tests/test_scripts.py` | the command line scripts, run as real subprocesses against a throwaway copy of the tooling |
+| `tests/test_assets.py` | the web assets: the manifest icons exist and are the right size, the service worker precaches files that are there, every element id the script uses exists in the page, the catalog points at builds that are on disk |
+| `tests/test_launcher.js` | the launcher itself: the real script from `index.html`, run against a small DOM stub in node |
+| `tests/e2e.js` | a real chromium over the DevTools protocol: the launcher loads, the clients are on screen, the launch button works, the diagnostics panel fills in, the shim runs and reports its errors |
+
+The `--slow` tests read all 375 MB of client builds, so they are off by
+default. They check that every build carries the current shim and that
+the committed catalog is what the tooling generates.
+
+A missing `node` or `chromium` skips the parts that need them.
+
+## Diagnostics
+
+Tap the logo three times, press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>,
+or add `?debug` to the URL. The panel has five tabs:
+
+- **Overview** — the install state, the service worker and its caches, the
+  catalog, and what the last client session reported.
+- **Storage** — how much disk is used and how much of it is the offline
+  copies, the caches, the launcher's own storage, the databases.
+- **Clients** — every client with its version, folder, size and whether it
+  is on disk.
+- **Logs** — what the launcher did, and what the client reported. The shim
+  keeps the last errors it saw in `localStorage` (`eaglercraft.shim.log`),
+  so a crash in the game shows up here instead of only in the console.
+- **Actions** — copy the whole thing as JSON, download it, or copy a short
+  Markdown bug report. It can also update the worker, ask for persistent
+  storage, and clear the caches.
+
+`?debug` also lifts the "install the PWA first" block, so the launcher can
+be looked at in a plain browser tab.
+
 ## How it works
 
 - `index.html` — the launcher UI: the folder tree, the client list, the
-  details modal, the downloads panel, PWA install handling.
+  details modal, the downloads panel, the diagnostics panel, PWA install
+  handling.
 - `clients/` — the client builds, in folders. `clients/index.json` is the
   generated catalog the launcher reads.
 - `sw.js` — service worker: precaches the launcher shell, serves the
@@ -27,6 +74,7 @@ Deployed hosting must be HTTPS for Chrome to offer install on a real URL.
   offline copies the user asked for.
 - `client-shim.js` — injected into every app page as it is served.
 - `manifest.json`, `icons/` — PWA manifest and icons.
+- `tests/` — the test suite.
 
 ### The client catalog
 
@@ -135,6 +183,7 @@ the recommended one.
 | `./inject-shim.py` | Injects the shim into every build under `clients/` |
 | `./inject-shim.py --check` | Reports which builds are out of date |
 | `./add-client.py` | Adds a build to the catalog in one step |
+| `./test.py` | Runs the test suite (add `--slow` for the checks that read every build) |
 
 The shim injection is idempotent: the block is marked with
 `<!--launcher-shim-->` and replaced, not appended, every time. A build
@@ -146,6 +195,11 @@ builds from being updated.
 `.github/workflows/rebuild-catalog.yml` runs `./build-index.py` on every
 push to `main` and commits the result, so nobody has to remember to run it
 by hand. Push a build with its sidecar and the catalog catches up.
+
+`.github/workflows/ci.yml` runs the test suite on every push and pull
+request: the catalog has to be exactly what the tooling generates, the
+manifest and the service worker have to point at files that exist, and
+the launcher has to work in a real browser.
 
 - The commit it makes carries `[skip ci]`, so it does not start the
   workflow all over again.

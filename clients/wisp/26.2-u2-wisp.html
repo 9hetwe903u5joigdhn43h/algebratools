@@ -1,6 +1,6 @@
 <html style="width:100%;height:100%;background-color:black;"><head>
 <!--launcher-shim-->
-<!-- source: client-shim.js (sha256:3ae0a74def9c) -->
+<!-- source: client-shim.js (sha256:76fcbd00271c) -->
 <meta charset="utf-8" />
 <script>
 /* Launcher shim for the Eaglercraft clients.
@@ -36,6 +36,45 @@
   if (window.__eaglercraftShim) return;
   window.__eaglercraftShim = true;
 
+  /* ------------------------------------------------------------------
+     The log
+
+     The game turns any uncaught error into a crash, so a session that
+     ends badly usually has a reason — but the reason is only visible in
+     the console, which nobody looks at. The shim keeps the last few
+     things that went wrong in localStorage, and the launcher's
+     diagnostics panel reads them back.
+     ------------------------------------------------------------------ */
+  var LOG_KEY = "eaglercraft.shim.log";
+  var LOG_MAX = 40;
+  var logEntries = [];
+
+  try {
+    var rawLog = localStorage.getItem(LOG_KEY);
+    if (rawLog) {
+      var parsedLog = JSON.parse(rawLog);
+      if (Array.isArray(parsedLog)) logEntries = parsedLog.slice(-LOG_MAX);
+    }
+  } catch (err) { /* no log yet */ }
+
+  function saveLog() {
+    try {
+      localStorage.setItem(LOG_KEY, JSON.stringify(logEntries.slice(-LOG_MAX)));
+    } catch (err) { /* ignore */ }
+  }
+
+  function logEvent(level, message) {
+    try {
+      logEntries.push({
+        at: Date.now(),
+        level: String(level || "info"),
+        message: String(message === undefined ? "" : message)
+      });
+      while (logEntries.length > LOG_MAX) logEntries.shift();
+      saveLog();
+    } catch (err) { /* ignore */ }
+  }
+
   function warn() {
     try { console.warn("[shim] " + Array.prototype.join.call(arguments, " ")); } catch (e) { /* ignore */ }
   }
@@ -59,12 +98,33 @@
   var stats = {
     time: Date.now(), lockCalls: 0, unlockCalls: 0, lockedSeen: false,
     fullscreenPatched: false, fsRequests: 0, fsOk: 0, fsError: "", escapeKeys: 0,
-    escLock: false
+    escLock: false, errors: 0, lastError: ""
   };
 
   function saveStats() {
     try { localStorage.setItem("eaglercraft.shim", JSON.stringify(stats)); } catch (err) { /* ignore */ }
   }
+
+  // The last thing that went wrong in the page. The game aborts on any
+  // uncaught error, so this is usually the reason the session ended.
+  try {
+    window.addEventListener("error", safe(function (event) {
+      var where = event && event.filename ? " (" + event.filename + ":" + event.lineno + ")" : "";
+      stats.lastError = String((event && event.message) || "unknown error") + where;
+      stats.errors++;
+      saveStats();
+      logEvent("error", stats.lastError);
+    }));
+
+    window.addEventListener("unhandledrejection", safe(function (event) {
+      var reason = event && event.reason;
+      stats.lastError = "unhandled rejection: " +
+        (reason && reason.message ? reason.message : String(reason));
+      stats.errors++;
+      saveStats();
+      logEvent("error", stats.lastError);
+    }));
+  } catch (err) { /* ignore */ }
 
   /* ------------------------------------------------------------------
      Keybinds — configurable from the launcher settings. They live in
@@ -152,6 +212,8 @@
         stats.lockCalls++;
         saveStats();
         warn("keyboard lock blocked — system shortcuts stay available");
+        logEvent("info", "The game asked for the whole keyboard; it was blocked so " +
+          "the system shortcuts keep working.");
         return Promise.resolve();
       }
 
@@ -382,6 +444,7 @@
             }, function (err) {
               stats.fsError = String((err && err.message) || err);
               saveStats();
+              logEvent("error", "Fullscreen was refused: " + stats.fsError);
             });
           }
         }
@@ -463,6 +526,8 @@
       lines.push("audio master: " + (masterGain ? "yes" : "no"));
       lines.push("esc lock: " + (stats.escLock ? "yes" : "no"));
       lines.push("hold to exit: " + ESC_HOLD_MS + "ms");
+      lines.push("errors: " + (stats.errors || 0) +
+        (stats.lastError ? "  (" + stats.lastError + ")" : ""));
       return lines.join("\n");
     }
 

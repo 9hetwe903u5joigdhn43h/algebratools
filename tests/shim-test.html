@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>shim test</title>
+  <!-- The shim, exactly as the service worker injects it. -->
+  <script src="../client-shim.js"></script>
+</head>
+<body>
+  <p>Shim test page.</p>
+  <script>
+    // The shim runs before this script, so by now it has patched the
+    // keyboard lock, the fullscreen request and the panel.
+    setTimeout(function () {
+      // A deliberate error: the shim has to notice it and remember it, so
+      // the launcher can show it in the diagnostics panel.
+      setTimeout(function () {
+        throw new Error("shim test error");
+      }, 50);
+
+      setTimeout(function () {
+        var stats = null;
+        try {
+          stats = JSON.parse(localStorage.getItem("eaglercraft.shim"));
+        } catch (err) {
+          stats = null;
+        }
+        window.__shimStats = stats;
+        var log = null;
+        try {
+          log = JSON.parse(localStorage.getItem("eaglercraft.shim.log"));
+        } catch (err) {
+          log = null;
+        }
+        window.__shimLog = log;
+        document.title = stats ? "shim ran" : "shim did not run";
+      }, 250);
+    }, 100);
+  </script>
+</body>
+</html>

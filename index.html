@@ -995,6 +995,154 @@
 
     .offline-remove:hover { color: var(--text); border-color: #374151; }
 
+    /* --------------------------------------------------------------
+       The diagnostics panel
+
+       Everything worth knowing about the launcher, the service worker and
+       the last client session — and a way to hand the lot over when
+       something is wrong.
+       -------------------------------------------------------------- */
+    #diagnostics-panel {
+      position: fixed;
+      inset: 0;
+      z-index: 1400;
+      background: rgba(2, 6, 12, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    #diagnostics-panel.visible { display: flex; }
+
+    .diag-card {
+      width: min(100%, 760px);
+      max-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .diag-head-buttons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diag-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .diag-tab {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 7px;
+      padding: 5px 10px;
+      font: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .diag-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+
+    .diag-tab.selected {
+      color: var(--text);
+      border-color: var(--card-border);
+      background: rgba(34, 197, 94, 0.12);
+      font-weight: 600;
+    }
+
+    .diag-body {
+      margin-top: 12px;
+      overflow-y: auto;
+      min-height: 140px;
+      font-size: 0.8rem;
+    }
+
+    .diag-section { margin-bottom: 16px; }
+
+    .diag-section h3 {
+      margin: 0 0 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .diag-kv {
+      display: grid;
+      grid-template-columns: minmax(110px, 32%) minmax(0, 1fr);
+      gap: 3px 12px;
+      margin: 0;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.73rem;
+    }
+
+    .diag-kv dt { color: var(--text-muted); }
+    .diag-kv dd { margin: 0; overflow-wrap: anywhere; }
+
+    .diag-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.73rem;
+    }
+
+    .diag-table th,
+    .diag-table td {
+      text-align: left;
+      padding: 5px 8px 5px 0;
+      border-bottom: 1px solid var(--card-border);
+      vertical-align: top;
+    }
+
+    .diag-table th { color: var(--text-muted); font-weight: 600; }
+
+    .diag-ok { color: #86efac; }
+    .diag-warn { color: #fcd34d; }
+    .diag-bad { color: #fca5a5; }
+
+    .diag-log {
+      margin: 0;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+      font-size: 0.72rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: #cbd5e1;
+    }
+
+    .diag-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .diag-actions .btn {
+      margin-top: 0;
+      width: 100%;
+      padding: 9px 8px;
+      font-size: 0.8rem;
+    }
+
+    .diag-note {
+      margin: 10px 0 0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 560px) {
+      .diag-actions { grid-template-columns: 1fr; }
+      .diag-kv { grid-template-columns: minmax(0, 1fr); }
+      .diag-kv dt { margin-top: 6px; }
+    }
+
     @media (max-width: 860px) {
       .browser { grid-template-columns: minmax(0, 1fr); }
       .sidebar {
@@ -1187,10 +1335,25 @@
   <!-- Transient status message -->
   <div id="toast" role="status" aria-live="polite"></div>
 
-  <!-- PWA status debug panel (visible only to you, tap the logo 3 times) -->
-  <div id="debug-panel" style="display:none; position:fixed; top:10px; left:10px; right:10px; max-width:420px; background:rgba(0,0,0,0.85); border:1px solid #22c55e; border-radius:10px; padding:12px; z-index:2000; color:#fff; font-size:0.8rem; font-family:monospace;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><strong style="color:#22c55e;">PWA Debug</strong><button id="debug-close" style="background:none;border:none;color:#fff;cursor:pointer;">✕</button></div>
-    <div id="debug-content">Loading…</div>
+  <!-- Diagnostics: the launcher, the worker and the last client session -->
+  <div id="diagnostics-panel" aria-hidden="true">
+    <div class="settings-card diag-card" role="dialog" aria-modal="true" aria-labelledby="diagnostics-title">
+      <div class="settings-head">
+        <h2 id="diagnostics-title">Diagnostics</h2>
+        <div class="diag-head-buttons">
+          <button class="btn compact" id="diag-refresh">Refresh</button>
+          <button class="icon-btn" id="diag-close" aria-label="Close" title="Close">&#10005;</button>
+        </div>
+      </div>
+      <div class="diag-tabs" role="tablist" aria-label="Diagnostics sections">
+        <button class="diag-tab selected" role="tab" data-diag-tab="overview">Overview</button>
+        <button class="diag-tab" role="tab" data-diag-tab="storage">Storage</button>
+        <button class="diag-tab" role="tab" data-diag-tab="clients">Clients</button>
+        <button class="diag-tab" role="tab" data-diag-tab="logs">Logs</button>
+        <button class="diag-tab" role="tab" data-diag-tab="actions">Actions</button>
+      </div>
+      <div class="diag-body" id="diag-body">Loading…</div>
+    </div>
   </div>
 
   <script>
@@ -1218,6 +1381,10 @@
     // and never fetched before).
     let catalogMissing = false;
 
+    // The timestamp the catalog was generated at — when it was last
+    // refreshed from the server.
+    let catalogGenerated = "";
+
     // The last catalog that was rendered, so a repeated fetch that returns
     // the same thing does not rebuild the list.
     let catalogSignatureValue = null;
@@ -1233,6 +1400,12 @@
 
     const STORAGE_FAVORITES = "eaglercraft.launcher.favorites";
     const STORAGE_DEFAULT = "eaglercraft.launcher.defaultClient";
+
+    // ?debug opens the diagnostics panel and lifts the "install the PWA
+    // first" block, so a broken launcher can still be looked at.
+    function debugFlag() {
+      try { return /[?&]debug\b/.test(location.search || ""); } catch (err) { return false; }
+    }
 
     // The view that lists the recommended clients. It is not a folder — the
     // recommended client can sit in any folder — so it gets a name that can
@@ -1313,7 +1486,17 @@
         defaultClientId = clients[0]?.id || null;
       }
 
-      selectedClientId = defaultClientId;
+      // Keep the client's own selection when the catalog is refreshed: the
+      // list of clients changed, not the client's mind. The selection is
+      // only reset when the selected client is gone.
+      if (!hasValidSelection()) {
+        selectedClientId = defaultClientId;
+      }
+    }
+
+    // True when the client the user picked is still in the catalog.
+    function hasValidSelection() {
+      return !!(selectedClientId && clients.some((c) => c.id === selectedClientId));
     }
 
     /* --------------------------------------------------------------
@@ -1343,16 +1526,39 @@
       }
       catalogLoading = false;
 
+      try {
+        await applyCatalog(data, failed);
+      } catch (err) {
+        // A broken catalog must never take the launcher with it: the list
+        // that is already on screen stays, and the reason is logged.
+        catalogLoading = false;
+        logEvent("error", "The client catalog could not be read: " +
+          (err && err.message ? err.message : err));
+        updateLaunchButton();
+      }
+    }
+
+    // Put a freshly fetched catalog on screen.
+    async function applyCatalog(data, failed) {
       if (!data) {
-        clients = [];
-        groups = [];
-        applyPreferences(null);
-        renderTree();
-        renderClients();
+        // The fetch failed. That is NOT the same as "there are no clients":
+        // the catalog is served from the cache, so a failed refetch means
+        // "no news", not "the list is gone". Wiping the list here used to
+        // throw away a perfectly good catalog the moment a background
+        // refresh hit a flaky connection.
         catalogMissing = failed;
+        if (!clients.length) {
+          groups = [];
+          applyPreferences(null);
+          renderTree();
+          renderClients();
+        }
+        logEvent("warn", "The client catalog could not be fetched (" +
+          (failed ? "network error" : "not found") + ")");
         return;
       }
       catalogMissing = false;
+      catalogGenerated = String(data.generated || "");
 
       const raw = (data.clients || []).filter((c) => c && c.id && c.url);
       clients = raw.map((c) => ({
@@ -1380,8 +1586,17 @@
       // Only rebuild the list when something actually changed, so the
       // periodic check does not throw away the selection or the scroll
       // position.
+      //
+      // But the list on screen can drift out of step with the data — a
+      // page restored from the back/forward cache comes back with an
+      // empty list, for example. So the state of the screen is checked
+      // as well: if the cards are not the ones the data calls for, the
+      // list is built again.
       const signature = catalogSignature(clients, groups);
-      if (signature === catalogSignatureValue) return;
+      if (signature === catalogSignatureValue && listMatchesData()) {
+        updateLaunchButton();
+        return;
+      }
       catalogSignatureValue = signature;
 
       applyPreferences(data.defaultClient || null);
@@ -1394,6 +1609,19 @@
         [c.id, c.name, c.version, c.author, c.description, c.icon, c.url,
          c.recommended ? "rec" : ""].join("|")
       ).join("\n") + "\n--\n" + groupList.map((g) => g.path + "|" + g.label).join("\n");
+    }
+
+    // True when the cards on screen are the ones the data calls for.
+    // When they are not, the list has to be built again even if the
+    // catalog itself did not change.
+    function listMatchesData() {
+      try {
+        const shown = visibleClients().length;
+        const cards = clientList.querySelectorAll(".client-card").length;
+        return cards === shown;
+      } catch (err) {
+        return false;
+      }
     }
 
     /* --------------------------------------------------------------
@@ -1679,6 +1907,35 @@
       return card;
     }
 
+    /* --------------------------------------------------------------
+       The launch button
+
+       The button has three states, and one function decides between them:
+       no clients at all, clients but the app is not installed (the PWA has
+       to be installed before it can play), and the normal case.
+
+       This used to be spread over four places, and the "no clients" branch
+       never undid itself: when the catalog arrived late — after a failed
+       first fetch, or in the background from the service worker — the list
+       appeared on screen while the button stayed disabled and kept saying
+       "No clients available". Everything that touches the button goes
+       through updateLaunchButton() now.
+       -------------------------------------------------------------- */
+    function updateLaunchButton() {
+      if (!clients.length) {
+        launchBtn.disabled = true;
+        launchBtn.textContent = catalogMissing ? "Catalog unavailable" : "No clients available";
+        return;
+      }
+      if (pwaEnforced) {
+        launchBtn.disabled = true;
+        launchBtn.textContent = "Install required";
+        return;
+      }
+      launchBtn.disabled = !hasValidSelection();
+      launchBtn.textContent = "Launch Client";
+    }
+
     function renderClients() {
       clientList.innerHTML = "";
 
@@ -1689,8 +1946,7 @@
           ? "The client catalog could not be loaded. It has to be fetched once while online — after that it works offline too."
           : "No clients in the catalog. Drop a build into clients/ and run ./build-index.py.";
         clientList.appendChild(empty);
-        launchBtn.disabled = true;
-        launchBtn.textContent = "No clients available";
+        updateLaunchButton();
         return;
       }
 
@@ -1702,6 +1958,7 @@
           ? "No clients match “" + searchTerm + "”."
           : "No clients in this folder.";
         clientList.appendChild(empty);
+        updateLaunchButton();
         return;
       }
 
@@ -1730,6 +1987,8 @@
         clientList.appendChild(heading);
         for (const c of items) clientList.appendChild(createClientCard(c));
       }
+
+      updateLaunchButton();
     }
 
     function selectClient(id) {
@@ -1740,6 +1999,7 @@
         card.classList.toggle("selected", selected);
         card.setAttribute("aria-selected", String(selected));
       });
+      updateLaunchButton();
     }
 
     function toggleFavorite(id) {
@@ -2151,6 +2411,15 @@
         showInstallRequired();
         return;
       }
+      // Offline and the build was never downloaded: the page would never
+      // arrive, and the worker would quietly serve the launcher back to
+      // itself. Say so instead of sending the user nowhere.
+      if (navigator.onLine === false && !offlineClients.has(c.url)) {
+        showToast("You are offline and <strong>" + escapeHtml(c.name) +
+          "</strong> is not downloaded. Download it first to play offline.", 8000);
+        logEvent("warn", "Launch refused: offline and " + c.id + " is not cached");
+        return;
+      }
       launchBtn.disabled = true;
       launchBtn.textContent = "Loading…";
       // Show the loading animation right away — the client page replaces the
@@ -2256,7 +2525,7 @@
       // The browser can install this page, so we are not in an installed app
       // window after all — re-check (an app window never gets this event).
       applyDisplayMode();
-      updateDebug();
+      logEvent("info", "The browser offered to install the launcher.");
     });
 
     window.addEventListener("appinstalled", () => {
@@ -2267,11 +2536,9 @@
       markInstalled();
       hideInstallUI();
       hideInstallRequired();
-      if (launchBtn) {
-        launchBtn.disabled = false;
-        launchBtn.textContent = "Launch Client";
-      }
-      updateDebug();
+      pwaEnforced = false;
+      updateLaunchButton();
+      logEvent("info", "The launcher was installed.");
     });
 
     let promptAvailable = false;
@@ -2416,7 +2683,6 @@
         // installable yet): send them to the official guide for their setup.
         openInstallGuide(guide);
       }
-      updateDebug();
     }
 
     bannerInstall.addEventListener("click", installPWA);
@@ -2556,14 +2822,15 @@
     function enforcePWA() {
       // If running in a browser tab (not installed as standalone PWA),
       // block launching and show the install-required overlay.
-      if (!isStandalone()) {
+      // ?debug lifts the block: when the launcher itself is broken, being
+      // told to install it is not helpful.
+      if (!isStandalone() && !debugFlag()) {
         pwaEnforced = true;
         enforcementMsg.classList.add("show");
         showInstallUI();
         showInstallRequired();
-        launchBtn.disabled = true;
-        launchBtn.textContent = "Install required";
       }
+      updateLaunchButton();
     }
 
     // Re-check whenever the display mode changes (windowed <-> fullscreen on
@@ -2574,11 +2841,11 @@
         enforcementMsg.classList.remove("show");
         hideInstallUI();
         hideInstallRequired();
-        launchBtn.disabled = false;
-        launchBtn.textContent = "Launch Client";
       } else {
         enforcePWA();
+        return;
       }
+      updateLaunchButton();
     }
 
     Object.values(displayModeMqs).forEach((mq) => {
@@ -2659,57 +2926,725 @@
     }
 
     /* --------------------------------------------------------------
-       Debug panel (tap logo 3 times to show)
+       Diagnostics
+
+       The old debug panel (tap the logo three times) printed a handful of
+       lines about the PWA state. This is the same idea, done properly: one
+       panel that collects everything worth knowing — the launcher, the
+       browser, the service worker, the storage, the catalog, the clients
+       and what the last client session reported — and can hand the whole
+       lot over as a JSON bundle or a Markdown bug report.
+
+       Open it with the gear-free route: tap the logo three times, press
+       Ctrl+Shift+D, or add ?debug to the URL.
        -------------------------------------------------------------- */
-    (function initDebug() {
+    const DIAG_MAX_EVENTS = 250;
+    const diagEvents = [];
+    let diagTab = "overview";
+    let diagReport = null;
+
+    function logEvent(level, message) {
+      try {
+        diagEvents.push({
+          at: Date.now(),
+          level: String(level || "info"),
+          message: String(message === undefined ? "" : message)
+        });
+        while (diagEvents.length > DIAG_MAX_EVENTS) diagEvents.shift();
+      } catch (err) { /* ignore */ }
+    }
+
+    // Anything that goes wrong anywhere in the launcher ends up here.
+    window.addEventListener("error", (event) => {
+      const where = event.filename ? " (" + event.filename + ":" + event.lineno + ")" : "";
+      logEvent("error", (event.message || "unknown error") + where);
+    });
+    window.addEventListener("unhandledrejection", (event) => {
+      const reason = event.reason;
+      logEvent("error", "unhandled rejection: " +
+        (reason && reason.message ? reason.message : String(reason)));
+    });
+
+    function readJson(key) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch (err) {
+        return null;
+      }
+    }
+
+    // The whole picture, as one object. Everything here is best-effort: a
+    // diagnostics panel that throws is worse than one that shows less.
+    async function collectDiagnostics() {
+      const report = {
+        generatedAt: new Date().toISOString(),
+        launcher: {
+          url: location.href,
+          origin: location.origin,
+          protocol: location.protocol,
+          secureContext: window.isSecureContext === true,
+          online: navigator.onLine !== false,
+          displayMode: currentDisplayMode(),
+          standalone: isStandalone(),
+          installed: isKnownInstalled(),
+          installPromptSeen: installPromptSeen,
+          pwaEnforced: pwaEnforced,
+          debugFlag: debugFlag()
+        },
+        browser: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          language: navigator.language,
+          hardwareConcurrency: navigator.hardwareConcurrency,
+          deviceMemory: navigator.deviceMemory || null,
+          maxTouchPoints: navigator.maxTouchPoints || 0,
+          touch: (navigator.maxTouchPoints || 0) > 0,
+          keyboardLockApi: typeof navigator.keyboard,
+          serviceWorkerApi: "serviceWorker" in navigator,
+          cachesApi: "caches" in window,
+          storageApi: "storage" in navigator
+        },
+        worker: {
+          supported: "serviceWorker" in navigator,
+          controlling: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+          scriptURL: (navigator.serviceWorker && navigator.serviceWorker.controller &&
+                      navigator.serviceWorker.controller.scriptURL) || ""
+        },
+        storage: {
+          estimate: null,
+          persisted: null,
+          localStorage: [],
+          indexedDB: []
+        },
+        catalog: {
+          generated: catalogGenerated,
+          missing: catalogMissing,
+          clients: clients.length,
+          groups: groups.length,
+          defaultClient: defaultClientId,
+          recommended: clients.filter((c) => c.recommended).map((c) => c.name),
+          signature: catalogSignatureValue
+        },
+        clients: clients.map((c) => ({
+          id: c.id,
+          name: c.name,
+          version: c.version,
+          author: c.author,
+          group: (c.groupPath || []).join("/"),
+          size: c.size,
+          offline: offlineClients.has(c.url),
+          offlineSize: offlineClients.get(c.url) || 0
+        })),
+        shim: readJson("eaglercraft.shim"),
+        shimLog: readJson("eaglercraft.shim.log") || [],
+        events: diagEvents.slice()
+      };
+
+      // Storage: how much is used, and how much of it is ours.
+      try {
+        if (navigator.storage && navigator.storage.estimate) {
+          const estimate = await navigator.storage.estimate();
+          report.storage.estimate = {
+            usage: estimate.usage || 0,
+            quota: estimate.quota || 0,
+            usageDetails: estimate.usageDetails || null
+          };
+        }
+      } catch (err) { /* ignore */ }
+      try {
+        if (navigator.storage && navigator.storage.persisted) {
+          report.storage.persisted = await navigator.storage.persisted();
+        }
+      } catch (err) { /* ignore */ }
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key) continue;
+          report.storage.localStorage.push({
+            key: key,
+            bytes: String(localStorage.getItem(key) || "").length
+          });
+        }
+      } catch (err) { /* ignore */ }
+      try {
+        if (indexedDB && indexedDB.databases) {
+          const dbs = await indexedDB.databases();
+          report.storage.indexedDB = (dbs || []).map((d) => ({
+            name: d.name || "",
+            version: d.version || null
+          }));
+        }
+      } catch (err) { /* ignore */ }
+
+      // What the worker knows: its caches and the offline copies.
+      try {
+        if ("caches" in window) {
+          const names = await caches.keys();
+          report.worker.caches = [];
+          for (const name of names) {
+            const cache = await caches.open(name);
+            const keys = await cache.keys();
+            report.worker.caches.push({ name: name, entries: keys.length });
+          }
+        }
+      } catch (err) { /* ignore */ }
+
+      try {
+        const info = await askWorker({ type: "worker-info" });
+        if (info) report.worker.details = info;
+      } catch (err) { /* ignore */ }
+
+      return report;
+    }
+
+    // Ask the service worker something and wait for the answer.
+    //
+    // The reply comes back on the service worker *container* — that is
+    // where the worker's messages arrive (the same place the offline
+    // status comes from), not on the controller object.
+    function askWorker(message, timeoutMs) {
+      return new Promise((resolve) => {
+        if (!("serviceWorker" in navigator)) {
+          resolve(null);
+          return;
+        }
+        const channel = "diag-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+
+        const onMessage = (event) => {
+          const data = event.data || {};
+          if (data.type !== "worker-reply" || data.channel !== channel) return;
+          clearTimeout(timer);
+          navigator.serviceWorker.removeEventListener("message", onMessage);
+          resolve(data.payload || null);
+        };
+
+        const timer = setTimeout(() => {
+          navigator.serviceWorker.removeEventListener("message", onMessage);
+          resolve(null);
+        }, timeoutMs || 2500);
+
+        navigator.serviceWorker.addEventListener("message", onMessage);
+
+        const send = (worker) => {
+          if (!worker) {
+            navigator.serviceWorker.removeEventListener("message", onMessage);
+            resolve(null);
+            return;
+          }
+          try {
+            worker.postMessage(Object.assign({ channel: channel }, message));
+          } catch (err) {
+            navigator.serviceWorker.removeEventListener("message", onMessage);
+            resolve(null);
+          }
+        };
+
+        const controller = navigator.serviceWorker.controller;
+        if (controller) {
+          send(controller);
+          return;
+        }
+        // No controller yet (the worker is still installing): wait for it.
+        navigator.serviceWorker.ready
+          .then((registration) => {
+            send(registration.active || registration.waiting || registration.installing);
+          })
+          .catch(() => {
+            navigator.serviceWorker.removeEventListener("message", onMessage);
+            resolve(null);
+          });
+      });
+    }
+
+    /* ---- rendering ------------------------------------------------ */
+
+    function diagRow(label, value) {
+      const dt = document.createElement("dt");
+      dt.textContent = label;
+      const dd = document.createElement("dd");
+      dd.textContent = value === undefined || value === null || value === "" ? "—" : String(value);
+      return [dt, dd];
+    }
+
+    function diagSection(title) {
+      const section = document.createElement("div");
+      section.className = "diag-section";
+      const heading = document.createElement("h3");
+      heading.textContent = title;
+      section.appendChild(heading);
+      return section;
+    }
+
+    function diagKeyValues(section, pairs) {
+      const list = document.createElement("dl");
+      list.className = "diag-kv";
+      pairs.forEach(([label, value]) => {
+        const row = diagRow(label, value);
+        list.appendChild(row[0]);
+        list.appendChild(row[1]);
+      });
+      section.appendChild(list);
+      return section;
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes) return "0 B";
+      const units = ["B", "KB", "MB", "GB"];
+      let value = bytes;
+      let unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+      return (value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)) + " " + units[unit];
+    }
+
+    function diagTable(headers, rows) {
+      const table = document.createElement("table");
+      table.className = "diag-table";
+      const head = document.createElement("tr");
+      headers.forEach((h) => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        head.appendChild(th);
+      });
+      table.appendChild(head);
+      rows.forEach((cells) => {
+        const row = document.createElement("tr");
+        cells.forEach((cell) => {
+          const td = document.createElement("td");
+          if (cell && typeof cell === "object" && cell.text !== undefined) {
+            td.textContent = cell.text;
+            if (cell.tone) td.className = "diag-" + cell.tone;
+          } else {
+            td.textContent = cell === undefined || cell === null ? "—" : String(cell);
+          }
+          row.appendChild(td);
+        });
+        table.appendChild(row);
+      });
+      return table;
+    }
+
+    function renderDiagnostics() {
+      const body = document.getElementById("diag-body");
+      if (!body || !diagReport) return;
+      body.innerHTML = "";
+
+      if (diagTab === "overview") {
+        const r = diagReport;
+        const install = diagSection("Install");
+        diagKeyValues(install, [
+          ["display mode", r.launcher.displayMode],
+          ["running as an app", r.launcher.standalone ? "yes" : "no"],
+          ["known installed", r.launcher.installed ? "yes" : "no"],
+          ["enforced", r.launcher.pwaEnforced ? "yes" : "no"],
+          ["protocol", r.launcher.protocol + (r.launcher.secureContext ? " (secure)" : " (not secure)")],
+          ["online", r.launcher.online ? "yes" : "no"]
+        ]);
+        body.appendChild(install);
+
+        const worker = diagSection("Service worker");
+        diagKeyValues(worker, [
+          ["supported", r.worker.supported ? "yes" : "no"],
+          ["controlling", r.worker.controlling ? "yes" : "no"],
+          ["script", r.worker.scriptURL || "—"],
+          ["caches", (r.worker.caches || []).map((c) => c.name + " (" + c.entries + ")").join(", ") || "none"],
+          ["client cache", r.worker.details ? r.worker.details.clientCache : "—"],
+          ["offline budget", r.worker.details ? formatBytes(r.worker.details.budget) : "—"]
+        ]);
+        body.appendChild(worker);
+
+        const catalogSection = diagSection("Catalog");
+        diagKeyValues(catalogSection, [
+          ["generated", r.catalog.generated || "unknown"],
+          ["clients", r.catalog.clients],
+          ["groups", r.catalog.groups],
+          ["default", r.catalog.defaultClient || "—"],
+          ["recommended", r.catalog.recommended.join(", ") || "none"],
+          ["loaded", r.catalog.missing ? "NO — could not be fetched" : "yes"]
+        ]);
+        body.appendChild(catalogSection);
+
+        const shim = diagSection("Last client session");
+        const shimStats = r.shim || {};
+        const shimErrors = Array.isArray(r.shimLog) ? r.shimLog.length : 0;
+        diagKeyValues(shim, [
+          ["shim ran", shimStats.time ? new Date(shimStats.time).toLocaleString() : "never"],
+          ["keyboard lock attempts", shimStats.lockCalls || 0],
+          ["locks released", shimStats.unlockCalls || 0],
+          ["fullscreen requests", (shimStats.fsRequests || 0) + " ok " + (shimStats.fsOk || 0)],
+          ["escape lock", shimStats.escLock ? "engaged" : "not engaged"],
+          ["errors reported", shimErrors]
+        ]);
+        body.appendChild(shim);
+        return;
+      }
+
+      if (diagTab === "storage") {
+        const r = diagReport;
+        const usage = diagSection("Usage");
+        const estimate = r.storage.estimate;
+        const offline = r.worker.details ? r.worker.details.offline : null;
+        diagKeyValues(usage, [
+          ["used", estimate ? formatBytes(estimate.usage) : "unknown"],
+          ["quota", estimate ? formatBytes(estimate.quota) : "unknown"],
+          ["persisted", r.storage.persisted === null ? "unknown" : (r.storage.persisted ? "yes" : "no")],
+          ["offline copies", offline
+            ? formatBytes(offline.bytes) + " (" + offline.count + " clients)"
+            : "unknown"]
+        ]);
+        body.appendChild(usage);
+
+        const caches = diagSection("Caches");
+        const cacheRows = (r.worker.caches || []).map((c) => [
+          c.name,
+          String(c.entries),
+          c.name === (r.worker.details && r.worker.details.clientCache) ? "client builds" : "launcher shell"
+        ]);
+        body.appendChild(cacheRows.length
+          ? diagTable(["cache", "entries", "holds"], cacheRows)
+          : diagNote("No caches yet."));
+
+        const copies = diagSection("Offline copies");
+        const offlineRows = r.clients.filter((c) => c.offline).map((c) => [
+          c.name, formatBytes(c.offlineSize), formatBytes(c.size),
+          c.offlineSize === c.size ? { text: "complete", tone: "ok" } : { text: "different size", tone: "warn" }
+        ]);
+        body.appendChild(offlineRows.length
+          ? diagTable(["client", "on disk", "catalog", "state"], offlineRows)
+          : diagNote("No clients have been downloaded for offline play."));
+
+        const ls = diagSection("Launcher storage");
+        body.appendChild(diagTable(["key", "bytes"],
+          r.storage.localStorage.map((k) => [k.key, String(k.bytes)])));
+
+        const idb = diagSection("Databases");
+        body.appendChild(idb.length
+          ? diagTable(["name", "version"], r.storage.indexedDB.map((d) => [d.name, String(d.version)]))
+          : diagNote("None reported."));
+        return;
+      }
+
+      if (diagTab === "clients") {
+        const r = diagReport;
+        const rows = r.clients.map((c) => [
+          c.name,
+          c.version || "—",
+          c.group || "—",
+          formatBytes(c.size),
+          c.offline ? { text: "on disk", tone: "ok" } : { text: "not downloaded", tone: "warn" }
+        ]);
+        const section = diagSection("Clients (" + r.clients.length + ")");
+        section.appendChild(rows.length
+          ? diagTable(["name", "version", "folder", "size", "offline"], rows)
+          : diagNote("The catalog is empty."));
+        body.appendChild(section);
+        return;
+      }
+
+      if (diagTab === "logs") {
+        const r = diagReport;
+        const launcher = diagSection("Launcher events");
+        const log = document.createElement("pre");
+        log.className = "diag-log";
+        const events = r.events || [];
+        log.textContent = events.length
+          ? events.map((e) => {
+              const when = new Date(e.at).toLocaleTimeString();
+              return when + "  " + e.level.toUpperCase().padEnd(5) + "  " + e.message;
+            }).join("\n")
+          : "Nothing logged.";
+        launcher.appendChild(log);
+        body.appendChild(launcher);
+
+        const shim = diagSection("Client session log");
+        const shimLog = document.createElement("pre");
+        shimLog.className = "diag-log";
+        const entries = Array.isArray(r.shimLog) ? r.shimLog : [];
+        shimLog.textContent = entries.length
+          ? entries.map((e) => {
+              const when = e.at ? new Date(e.at).toLocaleTimeString() : "?";
+              return when + "  " + String(e.level || "info").toUpperCase().padEnd(5) + "  " + (e.message || "");
+            }).join("\n")
+          : "The client did not report anything.";
+        shim.appendChild(shimLog);
+        body.appendChild(shim);
+        return;
+      }
+
+      if (diagTab === "actions") {
+        const section = diagSection("Take the diagnostics with you");
+        const grid = document.createElement("div");
+        grid.className = "diag-actions";
+        grid.appendChild(diagButton("Copy JSON", () => copyText(JSON.stringify(diagReport, null, 2))));
+        grid.appendChild(diagButton("Download JSON", () => downloadJson(diagReport)));
+        grid.appendChild(diagButton("Copy bug report", () => copyText(buildBugReport(diagReport))));
+        grid.appendChild(diagButton("Refresh", () => refreshDiagnostics()));
+        section.appendChild(grid);
+        section.appendChild(diagNote(
+          "The bug report is a short Markdown summary — paste it into an issue. " +
+          "The JSON has everything, including the launcher log."));
+        body.appendChild(section);
+
+        const worker = diagSection("Service worker");
+        const workerGrid = document.createElement("div");
+        workerGrid.className = "diag-actions";
+        workerGrid.appendChild(diagButton("Update the worker", async () => {
+          try {
+            const registration = await navigator.serviceWorker.getRegistration();
+            if (!registration) {
+              showToast("There is no service worker registered.");
+              return;
+            }
+            await registration.update();
+            showToast("The service worker was asked to update.");
+          } catch (err) {
+            showToast("The update failed: " + err);
+          }
+        }));
+        workerGrid.appendChild(diagButton("Request persistent storage", async () => {
+          try {
+            if (!navigator.storage || !navigator.storage.persist) {
+              showToast("This browser has no persistent storage API.");
+              return;
+            }
+            const granted = await navigator.storage.persist();
+            showToast(granted
+              ? "Persistent storage granted — the offline copies will stay."
+              : "The browser refused persistent storage.");
+          } catch (err) {
+            showToast("The request failed: " + err);
+          }
+        }));
+        worker.appendChild(workerGrid);
+        body.appendChild(worker);
+
+        const danger = diagSection("Start over");
+        const dangerGrid = document.createElement("div");
+        dangerGrid.className = "diag-actions";
+        dangerGrid.appendChild(diagButton("Clear the launcher cache", async () => {
+          // Clearing the cache puts the shell straight back, which takes a
+          // moment — the worker needs longer than the usual answer.
+          const reply = await askWorker({ type: "clear-caches", what: "launcher" }, 20000);
+          showToast(reply && reply.ok
+            ? "The launcher cache was cleared and rebuilt — reloading."
+            : "The launcher cache could not be cleared.");
+          if (reply && reply.ok) setTimeout(() => location.reload(), 600);
+        }));
+        dangerGrid.appendChild(diagButton("Remove all offline copies", async () => {
+          const reply = await askWorker({ type: "clear-caches", what: "clients" }, 20000);
+          showToast(reply && reply.ok ? "The offline copies were removed." : "Nothing was removed.");
+          if (reply && reply.ok) {
+            offlineClients = new Map();
+            renderClients();
+            updateDownloadsButton();
+          }
+        }));
+        danger.appendChild(dangerGrid);
+        danger.appendChild(diagNote(
+          "Removing the offline copies frees the disk, but the clients have to be " +
+          "downloaded again before they can be played offline."));
+        body.appendChild(danger);
+        return;
+      }
+    }
+
+    function diagNote(text) {
+      const p = document.createElement("p");
+      p.className = "diag-note";
+      p.textContent = text;
+      return p;
+    }
+
+    function diagButton(label, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "btn secondary";
+      button.textContent = label;
+      button.addEventListener("click", async () => {
+        try {
+          await onClick();
+        } catch (err) {
+          showToast("That did not work: " + err);
+        }
+      });
+      return button;
+    }
+
+    function copyText(text) {
+      const done = () => showToast("Copied to the clipboard.");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+        return;
+      }
+      fallbackCopy(text, done);
+    }
+
+    function fallbackCopy(text, done) {
+      try {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.style.cssText = "position:fixed;left:-9999px;top:0";
+        document.body.appendChild(area);
+        area.select();
+        const ok = document.execCommand && document.execCommand("copy");
+        area.remove();
+        if (ok) done();
+        else showToast("The clipboard is not available here.");
+      } catch (err) {
+        showToast("The clipboard is not available here.");
+      }
+    }
+
+    function downloadJson(report) {
+      try {
+        const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "algebratools-diagnostics-" +
+          new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast("The diagnostics were downloaded.");
+      } catch (err) {
+        showToast("The download failed: " + err);
+      }
+    }
+
+    // A short, human-readable summary — the thing you paste into an issue.
+    function buildBugReport(report) {
+      const lines = [];
+      lines.push("### Launcher diagnostics");
+      lines.push("");
+      lines.push("```");
+      lines.push("generated:  " + report.generatedAt);
+      lines.push("launcher:   " + report.launcher.url);
+      lines.push("install:    " + report.launcher.displayMode +
+        (report.launcher.standalone ? " (installed)" : " (browser tab)"));
+      lines.push("worker:     " + (report.worker.controlling ? "controlling" : "not controlling"));
+      lines.push("catalog:    " + report.catalog.clients + " clients, " +
+        report.catalog.groups + " groups, generated " + (report.catalog.generated || "unknown"));
+      lines.push("storage:    " + (report.storage.estimate
+        ? formatBytes(report.storage.estimate.usage) + " used of " + formatBytes(report.storage.estimate.quota)
+        : "unknown") +
+        (report.storage.persisted ? ", persisted" : ""));
+      lines.push("offline:    " + report.clients.filter((c) => c.offline).length +
+        " of " + report.clients.length + " clients on disk");
+      if (report.shim && report.shim.time) {
+        lines.push("last shim:  " + new Date(report.shim.time).toLocaleString() +
+          ", lock calls " + (report.shim.lockCalls || 0) +
+          ", unlocks " + (report.shim.unlockCalls || 0));
+      } else {
+        lines.push("last shim:  never ran");
+      }
+      lines.push("browser:    " + report.browser.userAgent);
+      lines.push("```");
+      const errors = (report.events || []).filter((e) => e.level === "error");
+      if (errors.length) {
+        lines.push("");
+        lines.push("**Launcher errors**");
+        lines.push("");
+        errors.slice(-10).forEach((e) => {
+          lines.push("- `" + new Date(e.at).toLocaleTimeString() + "` " + e.message);
+        });
+      }
+      const shimEntries = Array.isArray(report.shimLog) ? report.shimLog : [];
+      if (shimEntries.length) {
+        lines.push("");
+        lines.push("**Client session log**");
+        lines.push("");
+        shimEntries.slice(-15).forEach((e) => {
+          lines.push("- `" + (e.at ? new Date(e.at).toLocaleTimeString() : "?") + "` " +
+            (e.level || "info") + ": " + (e.message || ""));
+        });
+      }
+      return lines.join("\n");
+    }
+
+    async function refreshDiagnostics() {
+      const body = document.getElementById("diag-body");
+      if (body) body.textContent = "Collecting…";
+      diagReport = await collectDiagnostics();
+      renderDiagnostics();
+    }
+
+    function openDiagnostics() {
+      const panel = document.getElementById("diagnostics-panel");
+      if (!panel) return;
+      panel.classList.add("visible");
+      panel.setAttribute("aria-hidden", "false");
+      refreshDiagnostics();
+    }
+
+    function closeDiagnostics() {
+      const panel = document.getElementById("diagnostics-panel");
+      if (!panel) return;
+      panel.classList.remove("visible");
+      panel.setAttribute("aria-hidden", "true");
+    }
+
+    function diagnosticsVisible() {
+      const panel = document.getElementById("diagnostics-panel");
+      return !!(panel && panel.classList.contains("visible"));
+    }
+
+    // The old debug panel was hidden behind the logo. It still is — but it
+    // is a proper dialog now, and there are two more ways in.
+    (function initDiagnostics() {
       let logoTapCount = 0;
       clientLogo.addEventListener("click", () => {
         logoTapCount++;
         if (logoTapCount >= 3) {
-          const dp = document.getElementById("debug-panel");
-          dp.style.display = dp.style.display === "none" ? "block" : "none";
-          updateDebug();
           logoTapCount = 0;
+          if (diagnosticsVisible()) closeDiagnostics();
+          else openDiagnostics();
         }
       });
-      document.getElementById("debug-close").addEventListener("click", () => {
-        document.getElementById("debug-panel").style.display = "none";
+
+      const closeBtn = document.getElementById("diag-close");
+      if (closeBtn) closeBtn.addEventListener("click", closeDiagnostics);
+
+      const refreshBtn = document.getElementById("diag-refresh");
+      if (refreshBtn) refreshBtn.addEventListener("click", refreshDiagnostics);
+
+      document.querySelectorAll(".diag-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          diagTab = tab.dataset.diagTab || "overview";
+          document.querySelectorAll(".diag-tab").forEach((other) => {
+            other.classList.toggle("selected", other === tab);
+          });
+          renderDiagnostics();
+        });
       });
 
-      window.updateDebug = function updateDebug() {
-        const c = document.getElementById("debug-content");
-        const lines = [];
-        lines.push("standalone: " + isStandalone());
-        lines.push("display-mode: " + currentDisplayMode());
-        lines.push("protocol: " + location.protocol + (location.protocol === "file:" ? " (install unavailable — serve over http://localhost)" : ""));
-        lines.push("deferredInstallPrompt: " + (deferredInstallPrompt ? "yes" : "no"));
-        const guide = detectInstallGuide();
-        lines.push("install guide: " + guide.label + " -> " + guide.url);
-        let shim = "never ran";
-        try {
-          const raw = localStorage.getItem("eaglercraft.shim");
-          if (raw) {
-            let info = null;
-            try { info = JSON.parse(raw); } catch (err) { info = { time: Number(raw) }; }
-            if (info && typeof info === "object") {
-              const when = new Date(info.time || 0);
-              const stamp = isNaN(when.getTime()) ? "?" : when.toLocaleTimeString();
-              shim = "active (last run " + stamp +
-                ", lock calls " + (info.lockCalls || 0) +
-                ", unlocks " + (info.unlockCalls || 0) +
-                (info.lockedSeen ? ", lock WAS seen" : "") + ")";
-            }
-          }
-        } catch (err) { /* ignore */ }
-        lines.push("client shim: " + shim);
-        lines.push("controller: " + (navigator.serviceWorker.controller ? "yes" : "no"));
-        lines.push("manifest: checking…");
-        fetch("manifest.json").then(r => r.json()).then(m => {
-          lines.push("manifest name: " + m.name);
-          lines.push("manifest icons: " + (m.icons || []).length);
-          c.textContent = lines.join("\n");
-        }).catch(() => { lines.push("manifest: FAILED"); c.textContent = lines.join("\n"); });
-      };
+      const panel = document.getElementById("diagnostics-panel");
+      if (panel) {
+        panel.addEventListener("click", (event) => {
+          if (event.target === panel) closeDiagnostics();
+        });
+      }
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && diagnosticsVisible()) {
+          closeDiagnostics();
+          return;
+        }
+        // Ctrl+Shift+D opens the diagnostics without touching the mouse.
+        if (event.ctrlKey && event.shiftKey && (event.key === "d" || event.key === "D")) {
+          event.preventDefault();
+          if (diagnosticsVisible()) closeDiagnostics();
+          else openDiagnostics();
+        }
+      });
+
+      // ?debug opens the panel straight away — handy when the launcher
+      // itself is misbehaving and there is no UI to click.
+      if (debugFlag()) {
+        openDiagnostics();
+      }
     })();
 
     // Ask the worker which clients are on disk for offline play.
