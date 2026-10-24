@@ -91,12 +91,19 @@ clients/
 
 Folders can be nested as deep as you like — the sidebar tree follows the
 folder structure, and the client list groups by the next folder down.
+When a folder also contains HTML that is not a game build, its `_group.json`
+can list those exact relative paths in `exclude`; excluded pages are omitted
+from both the catalog and shim injection.
 
 `_group.json` sets the name and icon of a folder:
 
 ```json
 { "label": "Eaglercraft", "icon": "icons/icon-192.png", "order": 1 }
 ```
+
+For example, `modded/Chromium Client/` is a nested group with three game
+builds. Its bundled `Chromium Launcher.html` is excluded via the parent
+`modded/_group.json`, so the original launcher and support files stay intact.
 
 The sidecar next to a build sets what the card shows:
 

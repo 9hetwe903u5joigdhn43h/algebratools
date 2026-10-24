@@ -1,6 +1,14 @@
 {
-  "generated": "2026-10-22T03:14:48Z",
+  "generated": "2026-10-24T17:18:46Z",
   "groups": [
+    {
+      "path": "modded/Chromium Client",
+      "label": "Chromium Client",
+      "icon": "icons/icon-192.png",
+      "order": 0,
+      "count": 3,
+      "total": 3
+    },
     {
       "path": "vanilla",
       "label": "Vanilla",
@@ -15,7 +23,7 @@
       "icon": "icons/icon-192.png",
       "order": 1,
       "count": 2,
-      "total": 2
+      "total": 5
     },
     {
       "path": "wisp",
@@ -58,6 +66,57 @@
       "groupLabel": "Modded",
       "recommended": true,
       "size": 81300243
+    },
+    {
+      "id": "modded/Chromium Client/Chromium-Client-performance",
+      "url": "clients/modded/Chromium Client/Chromium-Client-performance.html",
+      "name": "Chromium Client Performance",
+      "version": "—",
+      "author": "",
+      "description": "",
+      "icon": "icons/icon-192.png",
+      "group": "modded",
+      "groupPath": [
+        "modded",
+        "Chromium Client"
+      ],
+      "groupLabel": "Chromium Client",
+      "recommended": false,
+      "size": 97133275
+    },
+    {
+      "id": "modded/Chromium Client/Chromium-Client-shaders",
+      "url": "clients/modded/Chromium Client/Chromium-Client-shaders.html",
+      "name": "Chromium Client Shaders",
+      "version": "—",
+      "author": "",
+      "description": "",
+      "icon": "icons/icon-192.png",
+      "group": "modded",
+      "groupPath": [
+        "modded",
+        "Chromium Client"
+      ],
+      "groupLabel": "Chromium Client",
+      "recommended": false,
+      "size": 98939762
+    },
+    {
+      "id": "modded/Chromium Client/Chromium-Client-vanilla",
+      "url": "clients/modded/Chromium Client/Chromium-Client-vanilla.html",
+      "name": "Chromium Client Vanilla",
+      "version": "—",
+      "author": "",
+      "description": "",
+      "icon": "icons/icon-192.png",
+      "group": "modded",
+      "groupPath": [
+        "modded",
+        "Chromium Client"
+      ],
+      "groupLabel": "Chromium Client",
+      "recommended": false,
+      "size": 96889046
     },
     {
       "id": "vanilla/26.2-dev-0.6",

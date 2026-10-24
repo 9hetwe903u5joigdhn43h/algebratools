@@ -131,6 +131,43 @@ test("the launch button is ready when the catalog loads", async () => {
   assertEqual(env.cards().length, 2, "both clients must be on screen");
 });
 
+test("nested folders can be selected to filter their clients", async () => {
+  const cat = catalog();
+  const path = ["modded", "Chromium Client"];
+  const names = ["performance", "shaders", "vanilla"];
+  cat.groups.push({
+    path: path.join("/"),
+    label: "Chromium Client",
+    icon: "",
+    order: 0,
+    count: names.length,
+    total: names.length,
+  });
+  cat.clients.push(...names.map((name) => ({
+    id: path.join("/") + "/Chromium-Client-" + name,
+    url: "clients/modded/Chromium Client/Chromium-Client-" + name + ".html",
+    name: "Chromium Client " + name,
+    version: "",
+    author: "",
+    description: "",
+    icon: "",
+    groupPath: path,
+    groupLabel: "Chromium Client",
+    recommended: false,
+    size: 1,
+  })));
+
+  const env = await boot({ catalog: cat });
+  assertEqual(env.cards().length, 5, "all top-level and nested clients must show");
+
+  env.run('activeGroup = "modded/Chromium Client"; renderTree(); renderClients();');
+  assertEqual(env.cards().length, 3, "the nested folder must show its three clients");
+  assert(
+    env.cards().every((card) => card.id.startsWith("modded/Chromium Client/")),
+    "the nested folder must not show clients from elsewhere"
+  );
+});
+
 test("REGRESSION: the launch button recovers when the catalog arrives late", async () => {
   // The first fetch fails (offline, flaky network, a cold service worker).
   const env = await boot({ catalog: catalog(), fetchFails: true });

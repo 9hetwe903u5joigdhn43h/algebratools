@@ -41,6 +41,12 @@ class ShimInjectionTests(TempTree):
         self.assertEqual(once, twice)
         self.assertEqual(once.count(clientlib.BEGIN), 1)
 
+    def test_inject_preserves_existing_line_endings(self):
+        original = "<html>\r\n<head>\r\n<title>x</title>\r\n</head>\r\n</html>\r\n"
+        out = clientlib.inject(original, clientlib.build_block())
+        self.assertEqual(clientlib.strip_block(out), original)
+        self.assertIn("\r\n" + clientlib.BEGIN + "\r\n", out)
+
     def test_inject_replaces_an_older_block(self):
         old = "\n" + clientlib.BEGIN + "\nold stuff\n" + clientlib.END + "\n"
         text = "<html><head>" + old + "<title>x</title></head><body></body></html>"
@@ -82,6 +88,30 @@ class ShimInjectionTests(TempTree):
         updated, _uptodate, _skipped = clientlib.inject_all(check=True)
         self.assertEqual([p.name for p in updated], ["one.html"])
         self.assertEqual(build.read_text(encoding="utf-8"), before)
+
+    def test_group_exclusions_keep_non_game_pages_out_of_catalog_and_injection(self):
+        chromium_dir = self.clients / "modded" / "Chromium Client"
+        launcher = make_build(chromium_dir / "Chromium Launcher.html")
+        builds = [
+            make_build(chromium_dir / f"game-{name}.html")
+            for name in ("performance", "shaders", "vanilla")
+        ]
+        self.write_group("modded", {
+            "exclude": ["Chromium Client/Chromium Launcher.html"],
+        })
+
+        updated, _uptodate, skipped = clientlib.inject_all()
+        self.assertEqual(set(updated), {path.relative_to(self.tmp) for path in builds})
+        self.assertEqual(skipped, [])
+        self.assertNotIn(clientlib.BEGIN, launcher.read_text(encoding="utf-8"))
+
+        catalog, _problems = clientlib.build_catalog()
+        self.assertEqual(len(catalog["clients"]), 3)
+        self.assertTrue(all("Chromium Launcher" not in c["name"] for c in catalog["clients"]))
+        self.assertTrue(all(
+            c["groupPath"] == ["modded", "Chromium Client"]
+            for c in catalog["clients"]
+        ))
 
 
 class CatalogTests(TempTree):

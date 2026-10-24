@@ -68,14 +68,18 @@ def strip_block(text: str) -> str:
         start = text.find(BEGIN)
         if start == -1:
             return text
-        # Swallow the newline that was added before the marker.
-        if start > 0 and text[start - 1] == "\n":
+        # Swallow the line ending that was added before the marker.
+        if text[max(0, start - 2):start] == "\r\n":
+            start -= 2
+        elif start > 0 and text[start - 1] in "\r\n":
             start -= 1
         end = text.find(END, start)
         if end == -1:
             return text[:start] + text[start + len(BEGIN):]
         end += len(END)
-        if text[end:end + 1] == "\n":
+        if text[end:end + 2] == "\r\n":
+            end += 2
+        elif text[end:end + 1] in ("\r", "\n"):
             end += 1
         text = text[:start] + text[end:]
 
@@ -86,6 +90,9 @@ def inject(text: str, block: str) -> str:
     match = HEAD_RE.search(text)
     if not match:
         raise ValueError("no <head> tag found")
+    newline = re.search(r"\r\n|\r|\n", text)
+    if newline:
+        block = re.sub(r"\r\n|\r|\n", newline.group(0), block)
     at = match.end()
     return text[:at] + block + text[at:]
 
@@ -108,7 +115,8 @@ def inject_all(check=False, write=True, root=None):
     for path in iter_client_files(root):
         rel = path.relative_to(HERE) if HERE in path.parents else path
         try:
-            original = path.read_text(encoding="utf-8", errors="surrogateescape")
+            with path.open("r", encoding="utf-8", errors="surrogateescape", newline="") as handle:
+                original = handle.read()
         except OSError as err:
             skipped.append(rel)
             print(f"could not read {rel}: {err}", file=sys.stderr)
@@ -124,7 +132,8 @@ def inject_all(check=False, write=True, root=None):
         updated.append(rel)
         if check or not write:
             continue
-        path.write_text(new_text, encoding="utf-8", errors="surrogateescape")
+        with path.open("w", encoding="utf-8", errors="surrogateescape", newline="") as handle:
+            handle.write(new_text)
     return updated, uptodate, skipped
 
 
@@ -133,7 +142,11 @@ def inject_all(check=False, write=True, root=None):
 # ---------------------------------------------------------------------------
 
 def iter_client_files(root=None):
-    """Yield every client HTML file under `root`, sorted, depth first."""
+    """Yield every included client HTML file under `root`, sorted, depth first.
+
+    A folder's `_group.json` may list exact relative HTML paths in `exclude`
+    when that folder also contains non-game pages such as a bundled launcher.
+    """
     root = pathlib.Path(root) if root else CLIENTS_DIR
     if not root.is_dir():
         return
@@ -144,7 +157,24 @@ def iter_client_files(root=None):
         # Skip anything inside a hidden folder.
         if any(part.startswith(".") for part in rel.parts):
             continue
-        yield path
+        excluded = False
+        parent = path.parent
+        while parent == root or root in parent.parents:
+            meta = read_group_meta(parent)
+            exclusions = meta.get("exclude", [])
+            if isinstance(exclusions, list):
+                try:
+                    group_rel = path.relative_to(parent).as_posix()
+                except ValueError:
+                    group_rel = ""
+                if group_rel in exclusions:
+                    excluded = True
+                    break
+            if parent == root:
+                break
+            parent = parent.parent
+        if not excluded:
+            yield path
 
 
 def group_path_for(rel: pathlib.PurePath) -> list:

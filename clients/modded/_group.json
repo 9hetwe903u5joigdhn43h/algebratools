@@ -1,5 +1,8 @@
 {
   "label": "Modded",
   "icon": "icons/icon-192.png",
-  "order": 1
+  "order": 1,
+  "exclude": [
+    "Chromium Client/Chromium Launcher.html"
+  ]
 }
